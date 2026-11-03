@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: music
+
+resources:
+  - namespace.yaml
+  - storage.yaml
+  - postgres.yaml
+  - api.yaml
+  - ingress.yaml
+
+configMapGenerator:
+  - name: music-config
+    literals:
+      - NODE_ENV=production
+      - PORT=3000
+      - CORS_ORIGIN=https://music.snowsig.in
+      - MEDIA_ROOT=/srv/music
+
+# Images are referenced by bare name (music-server, music-web). deploy.sh wraps this base in a
+# temporary overlay that maps them to localhost:32000/<name>:<git-sha>.

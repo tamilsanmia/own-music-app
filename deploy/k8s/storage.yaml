@@ -1,0 +1,61 @@
+# Static hostPath volumes on the single microk8s node. Data lives at fixed paths so it is easy
+# to back up and survives a namespace or cluster rebuild (reclaimPolicy Retain).
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: music-media
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes: [ReadWriteMany]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: music-manual
+  hostPath:
+    path: /srv/music
+    type: Directory
+  claimRef:
+    namespace: music
+    name: media
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: music-db
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: music-manual
+  hostPath:
+    path: /srv/music-db
+    type: Directory
+  claimRef:
+    namespace: music
+    name: db
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: media
+  namespace: music
+spec:
+  storageClassName: music-manual
+  volumeName: music-media
+  accessModes: [ReadWriteMany]
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db
+  namespace: music
+spec:
+  storageClassName: music-manual
+  volumeName: music-db
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 10Gi

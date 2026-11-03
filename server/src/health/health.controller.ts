@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Readiness: the API can serve requests only when the database answers. */
   @Get()
   @HttpCode(HttpStatus.OK)
   async check(@Res({ passthrough: true }) res: Response) {
@@ -16,5 +17,11 @@ export class HealthController {
       res.status(HttpStatus.SERVICE_UNAVAILABLE);
       return { status: 'error', db: 'down' };
     }
+  }
+
+  /** Liveness: the process is up. Does not touch the database, so a DB outage doesn't restart pods. */
+  @Get('live')
+  live() {
+    return { status: 'ok' };
   }
 }

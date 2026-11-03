@@ -31,4 +31,12 @@ describe('GET /api/health', () => {
     expect(res.body).toEqual({ status: 'error', db: 'down' });
     spy.mockRestore();
   });
+
+  it('liveness does not depend on the database', async () => {
+    const prisma = app.get(PrismaService);
+    const spy = jest.spyOn(prisma, '$queryRaw').mockRejectedValue(new Error('connection lost'));
+    await request(app.getHttpServer()).get('/api/health/live').expect(200, { status: 'ok' });
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
 });

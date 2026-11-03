@@ -4,6 +4,9 @@ const defaults: Record<string, string> = {
   NODE_ENV: 'test',
   DATABASE_URL: 'postgresql://music:music@127.0.0.1:5433/music_test?schema=public',
   CORS_ORIGIN: 'http://localhost:5173',
+  JWT_SECRET: 'test-jwt-secret-test-jwt-secret-0123456789',
+  ADMIN_EMAIL: 'admin@test.local',
+  ADMIN_PASSWORD: 'admin-password-123',
 };
 
 for (const [key, value] of Object.entries(defaults)) {

@@ -9,6 +9,12 @@ const defaults: Record<string, string> = {
   ADMIN_PASSWORD: 'admin-password-123',
 };
 
+// Each test file gets its own scratch media directory.
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+defaults.MEDIA_ROOT = mkdtempSync(join(tmpdir(), 'music-media-'));
+
 for (const [key, value] of Object.entries(defaults)) {
   if (!process.env[key]) process.env[key] = value;
 }

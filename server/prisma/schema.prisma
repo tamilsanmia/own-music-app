@@ -43,3 +43,61 @@ model RefreshToken {
   @@index([familyId])
   @@index([userId])
 }
+
+model Artist {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  bio       String?
+  /// Image files live at <MEDIA_ROOT>/covers/<imageId>-{300,600}.webp. A new id on every upload.
+  imageId   String?  @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  albums    Album[]
+  tracks    Track[]
+
+  @@index([name])
+}
+
+model Album {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String
+  artistId    String   @db.Uuid
+  artist      Artist   @relation(fields: [artistId], references: [id], onDelete: Restrict)
+  releaseYear Int?
+  /// Cover files live at <MEDIA_ROOT>/covers/<coverId>-{300,600}.webp. A new id on every upload.
+  coverId     String?  @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tracks      Track[]
+
+  @@index([artistId])
+  @@index([createdAt])
+}
+
+enum TrackStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+/// Listeners only ever see READY tracks. Upload and transcoding fields arrive in Task 6.
+model Track {
+  id           String      @id @default(uuid()) @db.Uuid
+  title        String
+  albumId      String      @db.Uuid
+  album        Album       @relation(fields: [albumId], references: [id], onDelete: Restrict)
+  /// Usually the album artist; can differ for guest appearances.
+  artistId     String      @db.Uuid
+  artist       Artist      @relation(fields: [artistId], references: [id], onDelete: Restrict)
+  trackNumber  Int
+  durationMs   Int?
+  status       TrackStatus @default(PENDING)
+  errorMessage String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([albumId, trackNumber])
+  @@index([artistId])
+  @@index([status])
+}

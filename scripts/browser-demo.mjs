@@ -21,7 +21,11 @@ const step = (msg) => console.log(`==> ${msg}`);
 async function newPage() {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
-  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  // 401s are expected (session check while logged out, deactivated listener). Anything else,
+  // such as a CSP violation ("Refused to ...") or a script error, fails the demo.
+  page.on('console', (m) => {
+    if (m.type() === 'error' && !/status of 401/.test(m.text())) errors.push(m.text());
+  });
   page.on('pageerror', (e) => errors.push(e.message));
   return page;
 }

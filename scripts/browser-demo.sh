@@ -23,4 +23,5 @@ exit $status
 REMOTE
 mkdir -p "$REPO_ROOT/.data/browser-demo"
 scp -q "$HOST:/tmp/music-browser-demo/*.png" "$REPO_ROOT/.data/browser-demo/"
+ssh "$HOST" rm -rf /tmp/music-browser-demo
 echo "Screenshots: .data/browser-demo/"

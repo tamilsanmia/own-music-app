@@ -3,7 +3,7 @@
 A private, invite-only, Spotify-style music service.
 
 - `server/` — NestJS API and HLS transcoding worker (Prisma + PostgreSQL, BullMQ + Redis)
-- `web/` — React web player and admin panel (coming in Task 4)
+- `web/` — React web player and admin panel (Vite, Tailwind, TanStack Query)
 - `android/` — Kotlin / Jetpack Compose Android app (coming in Task 12)
 - `deploy/` — microk8s manifests and deploy scripts
 
@@ -34,6 +34,18 @@ scripts/node.sh server sh -c 'npm run build && PORT=3100 \
 curl localhost:3100/api/health   # {"status":"ok","db":"up"}
 ```
 
+Web app (proxies `/api`, `/stream` and `/media` to the API on :3100):
+
+```bash
+scripts/node.sh web npm ci
+scripts/node.sh web npm test                              # Vitest + Testing Library + MSW
+scripts/node.sh web npm run build                         # type-check + production build
+scripts/node.sh web npx vite --host 127.0.0.1 --port 5173 # dev server
+```
+
+With the API in development mode (`NODE_ENV=development`) the refresh cookie is sent without
+`Secure`, so login works on plain `http://localhost:5173`.
+
 ## Deployment (microk8s on the Dev server)
 
 The app runs in namespace `music` on the shared microk8s cluster on the Dev server
@@ -53,7 +65,12 @@ deploy/gen-secrets.sh admin@music.snowsig.in   # once; writes deploy/.env (gitig
 deploy/deploy.sh                               # rsync to /opt/music-app, build, push, apply, wait
 deploy/smoke.sh                                # HTTPS health check + certificate check
 deploy/demo-auth.sh                            # admin login, create listener, check 403/401
+scripts/browser-demo.sh --cleanup              # real-browser walkthrough (Playwright on Dev)
 ```
+
+`browser-demo.sh` runs Chromium in the Playwright image on the Dev server, saves screenshots to
+`.data/browser-demo/`, and with `--cleanup` removes the image again. Both demo scripts leave a
+deactivated `*-demo-*@music.snowsig.in` listener behind (there is no delete endpoint yet).
 
 The admin account (`ADMIN_EMAIL` / `ADMIN_PASSWORD` in `deploy/.env`) is created on the first
 start. Changing those values later does not change the existing account; use

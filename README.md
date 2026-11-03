@@ -100,6 +100,7 @@ All `/api` routes need `Authorization: Bearer <accessToken>` except `/api/health
 | Auth | `POST /api/auth/login` (`client: "web"` or `"mobile"`), `/refresh`, `/logout` |
 | Me | `GET /api/me`, `PATCH /api/me/password` |
 | Catalog (listeners) | `GET /api/home`, `/api/artists`, `/api/artists/:id`, `/api/albums/:id` |
+| Streaming | `GET /api/tracks/:id/stream-url`, then `GET /stream/<token>/<id>/master.m3u8` (no auth header) |
 | Users (admin) | `GET/POST /api/admin/users`, `PATCH /api/admin/users/:id` |
 | Artists (admin) | `GET/POST /api/admin/artists`, `PATCH/DELETE /api/admin/artists/:id`, `PUT/DELETE /api/admin/artists/:id/image` |
 | Albums (admin) | `GET/POST /api/admin/albums`, `GET/PATCH/DELETE /api/admin/albums/:id`, `PUT/DELETE /api/admin/albums/:id/cover` |
@@ -135,3 +136,22 @@ The worker (`node dist/worker.js`, Deployment `worker`) then transcodes one trac
 is about 1.6 times the size of a 320 kbps original.
 
 `deploy/demo-upload.sh [file]` runs the whole flow against production and prints the result.
+
+### Streaming
+
+`GET /api/tracks/:id/stream-url` (any logged-in user, READY tracks only) returns
+`{ url: "/stream/<token>/<trackId>/master.m3u8", expiresAt }`. Hand that URL, prefixed with the
+site origin, straight to hls.js, Safari's `<audio>` or ExoPlayer; no headers are needed.
+
+- The token is `base64url(userId.trackId.exp)` plus an HMAC-SHA256 signature with
+  `STREAM_SECRET`. It is valid for one track for 6 hours (`STREAM_TTL_SECONDS`). Players should
+  fetch a new URL when a track starts or the old one is close to `expiresAt`.
+- Segment URLs inside the playlists are relative, so they carry the token without the server
+  rewriting playlists.
+- Only `master.m3u8` and `<96k|160k|320k>/{index.m3u8, init_N.mp4, seg_NNN.m4s}` can be
+  fetched. Originals and anything else are unreachable.
+- Deactivating a user stops their stream links at once.
+- Responses are `Cache-Control: private, max-age=<seconds until expiry>` and support byte ranges.
+
+`deploy/demo-stream.sh` gets a stream URL for the newest track, decodes it with ffmpeg over
+HTTPS, and shows tampered tokens, missing tokens and other paths being refused.

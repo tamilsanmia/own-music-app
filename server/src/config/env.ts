@@ -18,6 +18,13 @@ export const envSchema = z.object({
   CORS_ORIGIN: z.string().url().default('https://music.snowsig.in'),
   MEDIA_ROOT: z.string().min(1).default('/srv/music'),
 
+  REDIS_URL: z
+    .string()
+    .default('redis://127.0.0.1:6379')
+    .refine((v) => /^rediss?:\/\//.test(v), 'REDIS_URL must be a redis:// URL'),
+  /** Redis key prefix for the job queue; tests use their own so they don't collide. */
+  QUEUE_PREFIX: z.string().min(1).default('music'),
+
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(15 * 60),
   REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),

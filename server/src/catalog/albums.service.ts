@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { MediaService } from '../media/media.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { presentAdminTrack } from '../tracks/presenters';
 import type { AdminAlbumsQuery, CreateAlbumDto, UpdateAlbumDto } from './dto';
 import { albumIsVisible, artistRef, presentAlbum, presentTrack, READY } from './presenters';
 
@@ -53,6 +54,19 @@ export class AlbumsService {
       this.prisma.album.count({ where }),
     ]);
     return { items: items.map((a) => ({ ...presentAlbum(a), trackCount: a._count.tracks })), total };
+  }
+
+  /** Album with every track in any state, for the admin's album page. */
+  async adminGet(id: string) {
+    const album = await this.prisma.album.findUnique({
+      where: { id },
+      include: {
+        artist: artistRef,
+        tracks: { orderBy: [{ trackNumber: 'asc' }, { createdAt: 'asc' }], include: { artist: artistRef } },
+      },
+    });
+    if (!album) throw new NotFoundException('Album not found');
+    return { ...presentAlbum(album), tracks: album.tracks.map(presentAdminTrack) };
   }
 
   async create(dto: CreateAlbumDto) {

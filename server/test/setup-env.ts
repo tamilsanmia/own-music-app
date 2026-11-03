@@ -7,6 +7,8 @@ const defaults: Record<string, string> = {
   JWT_SECRET: 'test-jwt-secret-test-jwt-secret-0123456789',
   ADMIN_EMAIL: 'admin@test.local',
   ADMIN_PASSWORD: 'admin-password-123',
+  REDIS_URL: 'redis://127.0.0.1:6380',
+  QUEUE_PREFIX: `music-test-${process.pid}-${Date.now()}`,
 };
 
 // Each test file gets its own scratch media directory.

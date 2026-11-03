@@ -6,7 +6,9 @@ resources:
   - namespace.yaml
   - storage.yaml
   - postgres.yaml
+  - redis.yaml
   - api.yaml
+  - worker.yaml
   - web.yaml
   - ingress.yaml
 
@@ -17,6 +19,8 @@ configMapGenerator:
       - PORT=3000
       - CORS_ORIGIN=https://music.snowsig.in
       - MEDIA_ROOT=/srv/music
+      - REDIS_URL=redis://redis:6379
+      - QUEUE_PREFIX=music
 
 # Images are referenced by bare name (music-server, music-web). deploy.sh wraps this base in a
 # temporary overlay that maps them to localhost:32000/<name>:<git-sha>.

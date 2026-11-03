@@ -27,10 +27,12 @@
     "@nestjs/throttler": "^6.7.1",
     "@prisma/client": "^6.19.3",
     "argon2": "^0.44.0",
+    "bullmq": "^5.81.5",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
     "cookie-parser": "^1.4.7",
     "helmet": "^8.3.0",
+    "ioredis": "^5.11.1",
     "prisma": "^6.19.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
@@ -59,6 +61,7 @@
     "prisma@6.19.3": true,
     "@prisma/engines@6.19.3": true,
     "argon2@0.44.0": true,
-    "sharp": false
+    "sharp": false,
+    "msgpackr-extract": false
   }
 }

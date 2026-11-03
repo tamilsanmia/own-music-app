@@ -6,14 +6,18 @@ import { validateEnv } from './config/env';
 import { HealthController } from './health/health.controller';
 import { MediaModule } from './media/media.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { QueueModule } from './queue/transcode-queue';
+import { TracksModule } from './tracks/tracks.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, cache: true, validate: validateEnv }),
     PrismaModule,
     MediaModule,
+    QueueModule,
     AuthModule,
     CatalogModule,
+    TracksModule,
   ],
   controllers: [HealthController],
 })

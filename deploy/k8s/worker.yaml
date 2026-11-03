@@ -1,0 +1,49 @@
+# Transcoding worker: same image as the API, different entrypoint. One job at a time, ffmpeg at
+# nice 10 and capped at 2 CPUs so the other apps on this server stay responsive.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: music
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # never two workers at once
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      terminationGracePeriodSeconds: 180 # let a running transcode finish on deploy
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        fsGroup: 1000
+      containers:
+        - name: worker
+          image: music-server
+          command: ["/usr/bin/tini", "--", "node", "dist/worker.js"]
+          envFrom:
+            - configMapRef:
+                name: music-config
+            - secretRef:
+                name: music-secrets
+          env:
+            - name: DATABASE_URL
+              value: postgresql://music:$(POSTGRES_PASSWORD)@postgres:5432/music?schema=public
+          resources:
+            requests: { cpu: 250m, memory: 256Mi }
+            limits: { cpu: "2", memory: 1Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: media
+              mountPath: /srv/music
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: media

@@ -75,13 +75,18 @@ model Album {
 }
 
 enum TrackStatus {
+  /// The admin is still sending the file in chunks.
+  UPLOADING
+  /// Uploaded and checked; waiting for the transcoding worker.
   PENDING
   PROCESSING
   READY
   FAILED
 }
 
-/// Listeners only ever see READY tracks. Upload and transcoding fields arrive in Task 6.
+/// Listeners only ever see READY tracks.
+/// Files: <MEDIA_ROOT>/tmp/<id>.part while uploading, originals/<id>.<originalExt> after,
+/// and hls/<id>/{master.m3u8, 96k/, 160k/, 320k/} once READY.
 model Track {
   id           String      @id @default(uuid()) @db.Uuid
   title        String
@@ -92,8 +97,16 @@ model Track {
   artist       Artist      @relation(fields: [artistId], references: [id], onDelete: Restrict)
   trackNumber  Int
   durationMs   Int?
-  status       TrackStatus @default(PENDING)
+  status       TrackStatus @default(UPLOADING)
   errorMessage String?
+  /// Name of the uploaded file, for the admin's reference.
+  originalFilename String?
+  /// Lowercase extension of the stored original, e.g. "flac".
+  originalExt  String?
+  /// Declared size of the upload in bytes.
+  sizeBytes    Int?
+  /// Codec, sample rate and channels of the original, from ffprobe.
+  sourceInfo   String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 

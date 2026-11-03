@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import type { Env } from '../config/env';
@@ -28,29 +28,48 @@ export function coverUrls(id: string | null | undefined): CoverUrls | null {
   return { small: `/media/covers/${id}-300.webp`, large: `/media/covers/${id}-600.webp` };
 }
 
+/** Size of a file in bytes, or 0 if it doesn't exist. */
+export async function fileSize(path: string): Promise<number> {
+  try {
+    return (await stat(path)).size;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return 0;
+    throw e;
+  }
+}
+
 /**
  * Files under MEDIA_ROOT:
- *   covers/  public, square WebP covers (served at /media/covers)
- *   tmp/     scratch space; writes land here first and are renamed into place
- * originals/ and hls/ are added in Task 6 and are never served statically.
+ *   covers/     public, square WebP covers (served at /media/covers)
+ *   originals/  uploaded audio as received, <trackId>.<ext>
+ *   hls/        transcoded streams, <trackId>/master.m3u8 (served only via signed /stream URLs)
+ *   tmp/        uploads in progress and work directories; renamed into place when complete
+ * Everything is on one filesystem, so rename() is atomic.
  */
 @Injectable()
 export class MediaService implements OnModuleInit {
   private readonly logger = new Logger(MediaService.name);
   readonly root: string;
   readonly coversDir: string;
+  readonly originalsDir: string;
+  readonly hlsRoot: string;
   readonly tmpDir: string;
 
   constructor(config: ConfigService<Env, true>) {
     this.root = config.get('MEDIA_ROOT', { infer: true });
     this.coversDir = join(this.root, 'covers');
+    this.originalsDir = join(this.root, 'originals');
+    this.hlsRoot = join(this.root, 'hls');
     this.tmpDir = join(this.root, 'tmp');
   }
 
   async onModuleInit(): Promise<void> {
-    await mkdir(this.coversDir, { recursive: true });
-    await mkdir(this.tmpDir, { recursive: true });
+    for (const dir of [this.coversDir, this.originalsDir, this.hlsRoot, this.tmpDir]) {
+      await mkdir(dir, { recursive: true });
+    }
   }
+
+  // ---- cover art ----
 
   /** Validate an uploaded image, write 300px and 600px square WebP versions, return the new id. */
   async saveCover(input: Buffer): Promise<string> {
@@ -96,5 +115,26 @@ export class MediaService implements OnModuleInit {
 
   coverPath(id: string, size: number): string {
     return join(this.coversDir, `${id}-${size}.webp`);
+  }
+
+  // ---- track audio ----
+
+  partPath(trackId: string): string {
+    return join(this.tmpDir, `${trackId}.part`);
+  }
+
+  originalPath(trackId: string, ext: string): string {
+    return join(this.originalsDir, `${trackId}.${ext}`);
+  }
+
+  hlsDir(trackId: string): string {
+    return join(this.hlsRoot, trackId);
+  }
+
+  /** Remove every file belonging to a track. Missing files are fine. */
+  async deleteTrackFiles(trackId: string, ext: string | null): Promise<void> {
+    await rm(this.partPath(trackId), { force: true });
+    if (ext) await rm(this.originalPath(trackId, ext), { force: true });
+    await rm(this.hlsDir(trackId), { recursive: true, force: true });
   }
 }

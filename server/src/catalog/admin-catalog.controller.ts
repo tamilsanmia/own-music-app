@@ -70,6 +70,11 @@ export class AdminAlbumsController {
     return this.albums.adminList(q);
   }
 
+  @Get(':id')
+  get(@Param('id', uuid) id: string) {
+    return this.albums.adminGet(id);
+  }
+
   @Post()
   create(@Body() dto: CreateAlbumDto) {
     return this.albums.create(dto);

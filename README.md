@@ -52,7 +52,12 @@ Deploy from WSL (uses the `Dev` host alias in `~/.ssh/config`):
 deploy/gen-secrets.sh admin@music.snowsig.in   # once; writes deploy/.env (gitignored, mode 600)
 deploy/deploy.sh                               # rsync to /opt/music-app, build, push, apply, wait
 deploy/smoke.sh                                # HTTPS health check + certificate check
+deploy/demo-auth.sh                            # admin login, create listener, check 403/401
 ```
+
+The admin account (`ADMIN_EMAIL` / `ADMIN_PASSWORD` in `deploy/.env`) is created on the first
+start. Changing those values later does not change the existing account; use
+`PATCH /api/me/password` (or the web app, from Task 4) instead.
 
 `deploy.sh` tags images with the git short SHA (plus `-dirty-<time>` for uncommitted changes),
 recreates the `music-secrets` Secret from `deploy/.env`, and runs Prisma migrations in the api

@@ -6,6 +6,8 @@ import { RequireAdmin, RequireAuth } from '@/auth/guards';
 import { AppLayout } from '@/components/AppLayout';
 import { ApiError } from '@/lib/api';
 import { AccountPage } from '@/pages/AccountPage';
+import { AlbumPage as ListenerAlbumPage } from '@/pages/AlbumPage';
+import { ArtistPage as ListenerArtistPage } from '@/pages/ArtistPage';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -45,6 +47,8 @@ export function AppRoutes() {
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route index element={<HomePage />} />
+          <Route path="albums/:id" element={<ListenerAlbumPage />} />
+          <Route path="artists/:id" element={<ListenerArtistPage />} />
           <Route path="account" element={<AccountPage />} />
           <Route path="admin" element={<RequireAdmin />}>
             <Route index element={<Navigate to="albums" replace />} />

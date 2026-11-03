@@ -3,6 +3,7 @@ import { lazy, Suspense, type ComponentType } from 'react';
 import { NavLink, Outlet } from 'react-router';
 import { useAuth } from '@/auth/AuthProvider';
 import { Spinner } from '@/components/ui/spinner';
+import { PlayerBar, usePlaybackEngine } from '@/player/PlayerBar';
 import { cn } from '@/lib/utils';
 
 function NavItem({ to, icon: Icon, label, end }: { to: string; icon: ComponentType<{ className?: string }>; label: string; end?: boolean }) {
@@ -29,9 +30,11 @@ const UploadIndicator = lazy(() => import('@/admin/UploadIndicator'));
 export function AppLayout() {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  usePlaybackEngine();
 
   return (
-    <div className="flex h-screen gap-2 bg-sidebar p-2">
+    <div className="flex h-screen flex-col gap-2 bg-sidebar p-2">
+      <div className="flex min-h-0 flex-1 gap-2">
       <aside className="flex w-60 shrink-0 flex-col gap-2">
         <nav aria-label="Main" className="rounded-lg bg-background p-3">
           <div className="mb-3 flex items-center gap-2 px-3 py-2 text-lg font-bold">
@@ -77,6 +80,8 @@ export function AppLayout() {
           </Suspense>
         </div>
       </main>
+      </div>
+      <PlayerBar />
     </div>
   );
 }

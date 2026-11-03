@@ -13,7 +13,10 @@ export const cat = {
     getAlbum: 0,
     retry: [] as string[],
     deleted: [] as string[],
+    streamUrl: [] as string[],
   },
+  /** Lifetime of stream URLs handed out by the mock. */
+  streamTtlMs: 6 * 3600_000,
   /** Called on every GET /api/admin/albums/:id, so tests can move tracks through states. */
   onAlbumGet: undefined as undefined | ((n: number) => void),
 };
@@ -26,7 +29,8 @@ export function resetCatalog(): void {
   cat.albums = [];
   cat.tracks = [];
   cat.chunkBytes = 4;
-  cat.calls = { chunks: [], getAlbum: 0, retry: [], deleted: [] };
+  cat.calls = { chunks: [], getAlbum: 0, retry: [], deleted: [], streamUrl: [] };
+  cat.streamTtlMs = 6 * 3600_000;
   cat.onAlbumGet = undefined;
 }
 
@@ -84,7 +88,49 @@ const counts = (artistId: string) => ({
   trackCount: cat.tracks.filter((t) => t.artist.id === artistId).length,
 });
 
+const readyTracks = (albumId: string) =>
+  cat.tracks
+    .filter((t) => t.albumId === albumId && t.status === 'READY')
+    .sort((a, b) => a.trackNumber - b.trackNumber)
+    .map((t) => ({ id: t.id, title: t.title, trackNumber: t.trackNumber, durationMs: t.durationMs, artist: t.artist }));
+const visibleAlbums = () => cat.albums.filter((a) => readyTracks(a.id).length > 0);
+const isUser = (request: Request) => {
+  const id = request.headers.get('authorization')?.replace(/^Bearer at-/, '');
+  return authDb.users.some((u) => u.id === id && u.isActive);
+};
+
+/** Listener endpoints: only READY tracks, as on the real server. */
+export const listenerHandlers = [
+  http.get('*/api/home', ({ request }) => {
+    if (!isUser(request)) return deny();
+    return HttpResponse.json({ newAlbums: [...visibleAlbums()].reverse().map(presentAlbum) });
+  }),
+  http.get('*/api/albums/:id', ({ request, params }) => {
+    if (!isUser(request)) return deny();
+    const a = visibleAlbums().find((x) => x.id === params.id);
+    return a ? HttpResponse.json({ ...presentAlbum(a), tracks: readyTracks(a.id) }) : notFound();
+  }),
+  http.get('*/api/artists/:id', ({ request, params }) => {
+    if (!isUser(request)) return deny();
+    const artist = cat.artists.find((x) => x.id === params.id);
+    const albums = visibleAlbums().filter((a) => a.artistId === params.id);
+    return artist && albums.length ? HttpResponse.json({ ...artist, albums: albums.map(presentAlbum) }) : notFound();
+  }),
+  http.get('*/api/tracks/:id/stream-url', ({ request, params }) => {
+    if (!isUser(request)) return deny();
+    const t = cat.tracks.find((x) => x.id === params.id && x.status === 'READY');
+    if (!t) return notFound();
+    cat.calls.streamUrl.push(t.id);
+    const n = cat.calls.streamUrl.length;
+    return HttpResponse.json({
+      url: `/stream/tok${n}/${t.id}/master.m3u8`,
+      expiresAt: new Date(Date.now() + cat.streamTtlMs).toISOString(),
+    });
+  }),
+];
+
 export const catalogHandlers = [
+  ...listenerHandlers,
   http.get('*/api/admin/artists', ({ request }) => {
     if (!isAdmin(request)) return deny();
     return HttpResponse.json({ items: cat.artists.map((a) => ({ ...a, ...counts(a.id) })), total: cat.artists.length });

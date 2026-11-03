@@ -1,4 +1,4 @@
-import { ImageIcon, Loader2, Upload } from 'lucide-react';
+import { Loader2, Upload } from 'lucide-react';
 import { useRef, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,19 +25,8 @@ export function TrackStatusBadge({ status }: { status: TrackStatus }) {
   );
 }
 
-export function Artwork({ image, alt, className, round }: { image: ImageUrls | null; alt: string; className?: string; round?: boolean }) {
-  return image ? (
-    <img src={image.small} alt={alt} className={cn('aspect-square object-cover', round ? 'rounded-full' : 'rounded-md', className)} />
-  ) : (
-    <div
-      role="img"
-      aria-label={alt}
-      className={cn('flex aspect-square items-center justify-center bg-surface-3 text-muted', round ? 'rounded-full' : 'rounded-md', className)}
-    >
-      <ImageIcon className="size-1/3" aria-hidden />
-    </div>
-  );
-}
+export { Artwork } from '@/components/Artwork';
+import { Artwork } from '@/components/Artwork';
 
 /** Large artwork with "Upload"/"Replace" and "Remove" buttons. */
 export function ImageEditor({

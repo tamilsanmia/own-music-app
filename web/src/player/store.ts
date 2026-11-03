@@ -14,6 +14,8 @@ import {
 export interface QueueTrack {
   id: string;
   title: string;
+  /** Album position, shown on album pages. */
+  trackNumber?: number;
   durationMs: number | null;
   artist: Ref;
   album: { id: string; title: string; cover: ImageUrls | null };

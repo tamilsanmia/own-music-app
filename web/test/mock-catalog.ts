@@ -14,7 +14,14 @@ export const cat = {
     retry: [] as string[],
     deleted: [] as string[],
     streamUrl: [] as string[],
+    search: [] as string[],
+    plays: [] as string[],
   },
+  /** userId -> liked track ids, newest first. */
+  likes: new Map<string, string[]>(),
+  /** userId -> [trackId, playedAt ms] newest last. */
+  history: new Map<string, [string, number][]>(),
+  failLikes: false,
   /** Lifetime of stream URLs handed out by the mock. */
   streamTtlMs: 6 * 3600_000,
   /** Called on every GET /api/admin/albums/:id, so tests can move tracks through states. */
@@ -29,7 +36,10 @@ export function resetCatalog(): void {
   cat.albums = [];
   cat.tracks = [];
   cat.chunkBytes = 4;
-  cat.calls = { chunks: [], getAlbum: 0, retry: [], deleted: [], streamUrl: [] };
+  cat.calls = { chunks: [], getAlbum: 0, retry: [], deleted: [], streamUrl: [], search: [], plays: [] };
+  cat.likes = new Map();
+  cat.history = new Map();
+  cat.failLikes = false;
   cat.streamTtlMs = 6 * 3600_000;
   cat.onAlbumGet = undefined;
 }
@@ -93,6 +103,20 @@ const readyTracks = (albumId: string) =>
     .filter((t) => t.albumId === albumId && t.status === 'READY')
     .sort((a, b) => a.trackNumber - b.trackNumber)
     .map((t) => ({ id: t.id, title: t.title, trackNumber: t.trackNumber, durationMs: t.durationMs, artist: t.artist }));
+function withAlbum(id: string) {
+  const t = cat.tracks.find((x) => x.id === id && x.status === 'READY');
+  if (!t) return undefined;
+  const al = cat.albums.find((a) => a.id === t.albumId)!;
+  return {
+    id: t.id,
+    title: t.title,
+    trackNumber: t.trackNumber,
+    durationMs: t.durationMs,
+    artist: t.artist,
+    album: { id: al.id, title: al.title, cover: al.cover },
+  };
+}
+const callerId = (request: Request) => request.headers.get('authorization')?.replace(/^Bearer at-/, '') ?? '';
 const visibleAlbums = () => cat.albums.filter((a) => readyTracks(a.id).length > 0);
 const isUser = (request: Request) => {
   const id = request.headers.get('authorization')?.replace(/^Bearer at-/, '');
@@ -129,7 +153,63 @@ export const listenerHandlers = [
   }),
 ];
 
+/** Search, likes and history, with simple substring matching instead of trigram ranking. */
+export const libraryHandlers = [
+  http.get('*/api/search', ({ request }) => {
+    if (!isUser(request)) return deny();
+    const q = new URL(request.url).searchParams.get('q')!.toLowerCase();
+    cat.calls.search.push(q);
+    const hit = (s: string) => s.toLowerCase().includes(q);
+    const tracks = cat.tracks.filter((t) => t.status === 'READY' && (hit(t.title) || hit(t.artist.name))).map((t) => withAlbum(t.id)!);
+    const albums = visibleAlbums().filter((a) => hit(a.title)).map(presentAlbum);
+    const artists = cat.artists.filter((a) => hit(a.name) && cat.tracks.some((t) => t.artist.id === a.id && t.status === 'READY'));
+    return HttpResponse.json({ tracks, albums, artists });
+  }),
+  http.get('*/api/me/likes/ids', ({ request }) => {
+    if (!isUser(request)) return deny();
+    return HttpResponse.json(cat.likes.get(callerId(request)) ?? []);
+  }),
+  http.get('*/api/me/likes', ({ request }) => {
+    if (!isUser(request)) return deny();
+    const items = (cat.likes.get(callerId(request)) ?? []).map(withAlbum).filter(Boolean);
+    return HttpResponse.json({ items, total: items.length });
+  }),
+  http.put('*/api/me/likes/:id', ({ request, params }) => {
+    if (!isUser(request)) return deny();
+    if (cat.failLikes) return HttpResponse.json({ message: 'Server error' }, { status: 500 });
+    const id = String(params.id);
+    const list = cat.likes.get(callerId(request)) ?? [];
+    cat.likes.set(callerId(request), [id, ...list.filter((x) => x !== id)]);
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.delete('*/api/me/likes/:id', ({ request, params }) => {
+    if (!isUser(request)) return deny();
+    cat.likes.set(callerId(request), (cat.likes.get(callerId(request)) ?? []).filter((x) => x !== params.id));
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.post('*/api/me/history', async ({ request }) => {
+    if (!isUser(request)) return deny();
+    const { trackId } = (await request.json()) as { trackId: string };
+    cat.calls.plays.push(trackId);
+    const list = cat.history.get(callerId(request)) ?? [];
+    list.push([trackId, Date.now()]);
+    cat.history.set(callerId(request), list);
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.get('*/api/me/recent', ({ request }) => {
+    if (!isUser(request)) return deny();
+    const seen = new Set<string>();
+    const items = [...(cat.history.get(callerId(request)) ?? [])]
+      .reverse()
+      .filter(([id]) => !seen.has(id) && seen.add(id))
+      .map(([id]) => withAlbum(id))
+      .filter(Boolean);
+    return HttpResponse.json({ items });
+  }),
+];
+
 export const catalogHandlers = [
+  ...libraryHandlers,
   ...listenerHandlers,
   http.get('*/api/admin/artists', ({ request }) => {
     if (!isAdmin(request)) return deny();

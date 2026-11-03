@@ -17,6 +17,8 @@ export function freshIp(): string {
 /** Wipe all tables except the admin, which AdminSeeder created at startup. */
 export async function resetDb(app: INestApplication): Promise<void> {
   const prisma = app.get(PrismaService);
+  await prisma.playHistory.deleteMany();
+  await prisma.likedTrack.deleteMany();
   await prisma.track.deleteMany();
   await prisma.album.deleteMany();
   await prisma.artist.deleteMany();

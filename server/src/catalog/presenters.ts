@@ -42,6 +42,21 @@ export function presentAlbum(a: AlbumRow) {
   };
 }
 
+/** Prisma include for tracks shown outside their album (search, likes, recently played). */
+export const trackWithAlbum = {
+  artist: artistRef,
+  album: { select: { id: true, title: true, coverId: true } },
+} as const;
+
+type TrackWithAlbumRow = TrackRow & { album: { id: string; title: string; coverId: string | null } };
+
+export function presentTrackWithAlbum(t: TrackWithAlbumRow) {
+  return {
+    ...presentTrack(t),
+    album: { id: t.album.id, title: t.album.title, cover: coverUrls(t.album.coverId) },
+  };
+}
+
 export function presentTrack(t: TrackRow) {
   return {
     id: t.id,

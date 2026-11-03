@@ -56,7 +56,7 @@ export function AlbumPage() {
         </button>
       </div>
 
-      <TrackList album={a} tracks={a.tracks} />
+      <TrackList items={toQueue(a, a.tracks)} variant="album" albumArtistId={a.artist.id} />
     </section>
   );
 }

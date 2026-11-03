@@ -9,6 +9,8 @@ import { AccountPage } from '@/pages/AccountPage';
 import { AlbumPage as ListenerAlbumPage } from '@/pages/AlbumPage';
 import { ArtistPage as ListenerArtistPage } from '@/pages/ArtistPage';
 import { HomePage } from '@/pages/HomePage';
+import { LikedPage } from '@/pages/LikedPage';
+import { SearchPage } from '@/pages/SearchPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
@@ -49,6 +51,8 @@ export function AppRoutes() {
           <Route index element={<HomePage />} />
           <Route path="albums/:id" element={<ListenerAlbumPage />} />
           <Route path="artists/:id" element={<ListenerArtistPage />} />
+          <Route path="search" element={<SearchPage />} />
+          <Route path="liked" element={<LikedPage />} />
           <Route path="account" element={<AccountPage />} />
           <Route path="admin" element={<RequireAdmin />}>
             <Route index element={<Navigate to="albums" replace />} />

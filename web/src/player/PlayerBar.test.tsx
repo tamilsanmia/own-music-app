@@ -1,51 +1,13 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { instances as fakeInstances, lastHls } from '../../test/fake-hls';
 import { cat, seedAlbum, seedTrack } from '../../test/mock-catalog';
 import { renderApp } from '../../test/render';
 import { getEngine } from './engine';
 import { usePlayer } from './store';
 
-// A stand-in for hls.js that records what the engine asks of it.
-const hlsMock = vi.hoisted(() => {
-  const instances: FakeHls[] = [];
-  class FakeHls {
-    static isSupported = () => true;
-    config: Record<string, unknown>;
-    source?: string;
-    media?: HTMLMediaElement;
-    destroyed = false;
-    handlers = new Map<string, (event: string, data: unknown) => void>();
-    recoverMediaError = vi.fn();
-    constructor(config: Record<string, unknown> = {}) {
-      this.config = config;
-      instances.push(this);
-    }
-    on(event: string, fn: (event: string, data: unknown) => void) {
-      this.handlers.set(event, fn);
-    }
-    loadSource(url: string) {
-      this.source = url;
-    }
-    attachMedia(media: HTMLMediaElement) {
-      this.media = media;
-    }
-    destroy() {
-      this.destroyed = true;
-    }
-    emit(event: string, data: unknown) {
-      this.handlers.get(event)?.(event, data);
-    }
-  }
-  return { FakeHls, instances };
-});
-
-vi.mock('hls.js', () => ({
-  default: hlsMock.FakeHls,
-  Events: { ERROR: 'hlsError' },
-  ErrorTypes: { NETWORK_ERROR: 'networkError', MEDIA_ERROR: 'mediaError' },
-}));
-
-const lastHls = () => hlsMock.instances[hlsMock.instances.length - 1];
+vi.mock('hls.js', () => import('../../test/fake-hls'));
+const hlsMock = { instances: fakeInstances };
 const audio = () => getEngine().audio;
 const fire = (type: string) => act(() => void audio().dispatchEvent(new Event(type)));
 const nowPlaying = () => screen.getByRole('link', { name: /^Now playing: / }).textContent;

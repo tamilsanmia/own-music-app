@@ -1,4 +1,4 @@
-import { Disc3, Home, LogOut, Mic2, Music2, UserCog, Users } from 'lucide-react';
+import { Disc3, Heart, Home, LogOut, Mic2, Music2, Search, UserCog, Users } from 'lucide-react';
 import { lazy, Suspense, type ComponentType } from 'react';
 import { NavLink, Outlet } from 'react-router';
 import { useAuth } from '@/auth/AuthProvider';
@@ -42,6 +42,8 @@ export function AppLayout() {
             Music
           </div>
           <NavItem to="/" end icon={Home} label="Home" />
+          <NavItem to="/search" icon={Search} label="Search" />
+          <NavItem to="/liked" icon={Heart} label="Liked Songs" />
         </nav>
 
         {isAdmin && (

@@ -1,7 +1,8 @@
 import type Hls from 'hls.js';
 import type { ErrorData } from 'hls.js';
 import { ApiError } from '@/lib/api';
-import { catalogApi } from '@/lib/catalog';
+import { catalogApi, libraryApi } from '@/lib/catalog';
+import { ListenCounter } from './history';
 import { currentTrack, usePlayer, type PlayerState, type QueueTrack } from './store';
 
 /** Fetch a new stream URL if the current one expires within this window. */
@@ -32,6 +33,9 @@ export class PlaybackEngine {
   private refreshedAfterError = false;
   private lastPositionReport = 0;
   private errorTypes: HlsModule['ErrorTypes'] | null = null;
+  private readonly listen = new ListenCounter();
+  /** Called after a play has been recorded on the server (e.g. to refresh "Recently played"). */
+  onPlayRecorded: ((trackId: string) => void) | null = null;
   private unsubscribe: () => void;
 
   constructor(audio: HTMLAudioElement = new Audio()) {
@@ -42,6 +46,7 @@ export class PlaybackEngine {
     audio.addEventListener('timeupdate', () => {
       report({ currentTime: audio.currentTime });
       this.updatePositionState();
+      this.countListening();
     });
     audio.addEventListener('durationchange', () => {
       if (Number.isFinite(audio.duration)) report({ duration: audio.duration });
@@ -96,6 +101,7 @@ export class PlaybackEngine {
     }
     if (s.playId !== this.playId) {
       this.playId = s.playId;
+      this.listen.reset();
       this.seek(0);
       if (s.playing) void this.play();
       else this.audio.pause();
@@ -123,6 +129,8 @@ export class PlaybackEngine {
 
   private async load(track: QueueTrack, autoplay: boolean, startAt: number): Promise<void> {
     const seq = ++this.loadSeq;
+    // A reload of the same track (fresh URL) keeps the listening already counted.
+    if (track.id !== this.trackId) this.listen.reset();
     const report = usePlayer.getState().report;
     this.trackId = track.id;
     this.teardown();
@@ -196,6 +204,19 @@ export class PlaybackEngine {
     usePlayer.getState().report({ error: 'Playback stopped: the stream could not be loaded.', playing: false, buffering: false });
     this.teardown();
     this.trackId = null;
+  }
+
+  private countListening(): void {
+    const id = this.trackId;
+    if (!id || this.audio.paused) return;
+    const track = currentTrack(usePlayer.getState());
+    const duration = Number.isFinite(this.audio.duration) ? this.audio.duration : (track?.durationMs ?? 0) / 1000;
+    if (this.listen.tick(this.audio.currentTime, duration)) {
+      libraryApi.recordPlay(id).then(
+        () => this.onPlayRecorded?.(id),
+        () => undefined, // a missed play count isn't worth bothering the listener about
+      );
+    }
   }
 
   private handlePlayError(e: unknown): void {

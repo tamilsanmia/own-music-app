@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { validateEnv } from './config/env';
+import { DiscoverModule } from './discover/discover.module';
 import { HealthController } from './health/health.controller';
 import { MediaModule } from './media/media.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -20,6 +21,7 @@ import { TracksModule } from './tracks/tracks.module';
     AuthModule,
     CatalogModule,
     TracksModule,
+    DiscoverModule,
   ],
   controllers: [HealthController],
 })

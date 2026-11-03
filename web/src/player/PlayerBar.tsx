@@ -1,8 +1,11 @@
 import { Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useShallow } from 'zustand/react/shallow';
+import { LikeButton } from '@/components/LikeButton';
 import { Spinner } from '@/components/ui/spinner';
+import { catalogKeys } from '@/lib/catalog';
 import { formatDuration } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { destroyEngine, getEngine } from './engine';
@@ -10,13 +13,14 @@ import { currentTrack, usePlayer } from './store';
 
 /** Mount once inside the logged-in layout. Stops playback and clears the queue on logout. */
 export function usePlaybackEngine(): void {
+  const queryClient = useQueryClient();
   useEffect(() => {
-    getEngine();
+    getEngine().onPlayRecorded = () => void queryClient.invalidateQueries({ queryKey: catalogKeys.recent });
     return () => {
       usePlayer.getState().reset();
       destroyEngine();
     };
-  }, []);
+  }, [queryClient]);
 }
 
 function IconButton({
@@ -150,6 +154,7 @@ export function PlayerBar() {
             {track.artist.name}
           </Link>
         </div>
+        <LikeButton trackId={track.id} title={track.title} className="shrink-0" />
       </div>
 
       <div className="flex flex-col items-center gap-1">

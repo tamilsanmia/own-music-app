@@ -67,6 +67,7 @@ deploy/smoke.sh                                # HTTPS health check + certificat
 deploy/demo-auth.sh                            # admin login, create listener, check 403/401
 scripts/browser-demo.sh auth                   # real-browser walkthrough (Playwright on Dev)
 scripts/browser-demo.sh --cleanup catalog      # create artist/album, upload cover + 3 tracks in the UI
+scripts/browser-demo.sh --cleanup player       # real playback in Google Chrome (has the AAC decoder)
 ```
 
 `browser-demo.sh` runs Chromium in the Playwright image on the Dev server, saves screenshots to
@@ -166,3 +167,22 @@ site origin, straight to hls.js, Safari's `<audio>` or ExoPlayer; no headers are
 
 `deploy/demo-stream.sh` gets a stream URL for the newest track, decodes it with ffmpeg over
 HTTPS, and shows tampered tokens, missing tokens and other paths being refused.
+
+## Web player
+
+Listeners browse Home (newest albums), album pages and artist pages. Clicking a track plays the
+album from there. The player bar has shuffle, previous, play/pause, next, repeat (off, all,
+one), a seek bar and volume (remembered per browser). OS media keys, headset buttons and the
+lock screen work through the Media Session API.
+
+- `src/player/queue.ts`: pure queue rules. "Previous" restarts the track after 3 s. A manual
+  "next" moves on even with repeat one. Shuffle keeps the playing track and orders the rest
+  randomly.
+- `src/player/store.ts`: zustand store with the queue and the user's intent (playing or not).
+- `src/player/engine.ts`: drives one `<audio>` element from the store. It fetches a signed
+  stream URL per track and plays it with hls.js (loaded on first play), or natively in Safari.
+  On a 401/403, or when resuming after the URL expired, it fetches a new URL and continues at
+  the same position.
+
+Unit tests use a fake hls.js. Playwright's bundled Chromium can't decode AAC, so the real
+playback check (`scripts/browser-demo.sh player`) runs Google Chrome.

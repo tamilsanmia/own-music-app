@@ -5,6 +5,7 @@
 # Usage: scripts/browser-demo.sh [--cleanup] [auth|catalog]
 #   auth     login, users, roles (scripts/browser-demo-auth.mjs) - default
 #   catalog  artist, album, cover and track uploads (scripts/browser-demo-catalog.mjs)
+#   player   real playback in Google Chrome, which has the AAC decoder Playwright's Chromium lacks
 #   --cleanup  remove the Playwright image from the server afterwards
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -13,6 +14,7 @@ PW_VERSION=1.64.1
 IMAGE="mcr.microsoft.com/playwright:v${PW_VERSION}-noble"
 CLEANUP=""; [ "${1:-}" = --cleanup ] && { CLEANUP=--cleanup; shift; }
 DEMO="${1:-auth}"
+CHANNEL=none; [ "$DEMO" = player ] && CHANNEL=chrome
 SCRIPT="$REPO_ROOT/scripts/browser-demo-$DEMO.mjs"
 [ -f "$SCRIPT" ] || { echo "No demo named $DEMO" >&2; exit 1; }
 
@@ -36,13 +38,14 @@ ssh "$HOST" 'rm -rf /tmp/music-browser-demo-assets && mkdir -p /tmp/music-browse
 if [ -n "$(ls -A "$ASSETS")" ]; then scp -q "$ASSETS"/* "$HOST:/tmp/music-browser-demo-assets/"; fi
 
 # ssh joins arguments into one string, so an empty one would vanish: pass "keep" instead.
-ssh "$HOST" bash -s -- "$IMAGE" "$PW_VERSION" "${CLEANUP:-keep}" <<'REMOTE'
+ssh "$HOST" bash -s -- "$IMAGE" "$PW_VERSION" "${CLEANUP:-keep}" "$CHANNEL" <<'REMOTE'
 set -uo pipefail
-IMAGE="$1"; PW_VERSION="$2"; CLEANUP="$3"
+IMAGE="$1"; PW_VERSION="$2"; CLEANUP="$3"; CHANNEL="$4"
 OUT=/tmp/music-browser-demo; rm -rf "$OUT"; mkdir -p "$OUT"; chmod 777 "$OUT"
-docker run --rm --ipc=host --env-file /opt/music-app/deploy/.env \
+docker run --rm --ipc=host --env-file /opt/music-app/deploy/.env -e BROWSER_CHANNEL="${CHANNEL#none}" \
   -v /tmp/music-browser-demo.mjs:/demo/demo.mjs:ro -v /tmp/music-browser-demo-assets:/assets:ro -v "$OUT":/out "$IMAGE" \
-  bash -c "cd /demo && npm i -s --no-fund --no-audit playwright@$PW_VERSION >/dev/null 2>&1 && node demo.mjs"
+  bash -c "cd /demo && npm i -s --no-fund --no-audit playwright@$PW_VERSION >/dev/null 2>&1 &&
+    if [ '$CHANNEL' != none ]; then npx playwright install --with-deps $CHANNEL >/dev/null 2>&1; fi && node demo.mjs"
 status=$?
 rm -rf /tmp/music-browser-demo.mjs /tmp/music-browser-demo-assets
 [ "$CLEANUP" = --cleanup ] && docker rmi -f "$IMAGE" >/dev/null

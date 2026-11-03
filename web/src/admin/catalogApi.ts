@@ -90,7 +90,9 @@ export const albumsApi = {
     api<Album>('/api/admin/albums', { method: 'POST', json: input }),
   update: (albumId: string, input: { title?: string; artistId?: string; releaseYear?: number | null }) =>
     api<Album>(`/api/admin/albums/${id(albumId)}`, { method: 'PATCH', json: input }),
-  delete: (albumId: string) => api<void>(`/api/admin/albums/${id(albumId)}`, { method: 'DELETE' }),
+  /** With `withTracks`, the album's tracks and their files are deleted too. */
+  delete: (albumId: string, withTracks = false) =>
+    api<void>(`/api/admin/albums/${id(albumId)}${withTracks ? '?deleteTracks=true' : ''}`, { method: 'DELETE' }),
   setCover: (albumId: string, file: File) =>
     api<Album>(`/api/admin/albums/${id(albumId)}/cover`, { method: 'PUT', body: imageForm(file) }),
   removeCover: (albumId: string) => api<Album>(`/api/admin/albums/${id(albumId)}/cover`, { method: 'DELETE' }),

@@ -1,15 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { adminKeys, albumsApi, type AdminAlbumDetail } from '@/admin/catalogApi';
 import { ImageEditor } from '@/admin/components';
 import { adminConfig } from '@/admin/config';
+import { DeleteAlbumButton } from '@/admin/DeleteAlbumButton';
 import { ArtistSelect, errorText, parseYear } from '@/admin/dialogs';
 import { TracksTable } from '@/admin/TracksTable';
 import { UploadPanel, useAlbumUploads } from '@/admin/UploadPanel';
 import { Button } from '@/components/ui/button';
-import { ConfirmButton } from '@/components/ui/confirm-dialog';
 import { Field, FormError, Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { ApiError } from '@/lib/api';
@@ -128,27 +128,14 @@ export default function AlbumPage() {
         <TracksTable albumId={a.id} tracks={a.tracks} uploadingIds={uploadingIds} />
       </div>
 
-      <div className="border-t border-border pt-6">
-        {a.tracks.length === 0 ? (
-          <ConfirmButton
-            trigger={
-              <Button variant="outline">
-                <Trash2 aria-hidden /> Delete album
-              </Button>
-            }
-            title={`Delete “${a.title}”?`}
-            description="This can’t be undone."
-            onConfirm={async () => {
-              await albumsApi.delete(a.id);
-              queryClient.removeQueries({ queryKey: adminKeys.album(a.id) });
-              navigate(`/admin/artists/${a.artist.id}`, { replace: true });
-              await queryClient.invalidateQueries({ queryKey: adminKeys.allAlbums });
-              await queryClient.invalidateQueries({ queryKey: adminKeys.artists });
-            }}
-          />
-        ) : (
-          <p className="text-sm text-muted">To delete this album, first delete its tracks.</p>
-        )}
+      <div className="flex flex-wrap items-center gap-4 border-t border-border pt-6">
+        <DeleteAlbumButton
+          album={a}
+          trackCount={a.tracks.length}
+          disabled={activeUploads}
+          onDeleted={() => navigate(`/admin/artists/${a.artist.id}`, { replace: true })}
+        />
+        {activeUploads && <p className="text-sm text-muted">Wait for the uploads to finish before deleting.</p>}
       </div>
     </section>
   );

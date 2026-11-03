@@ -305,6 +305,16 @@ export const catalogHandlers = [
     Object.assign(t, (await request.json()) as Partial<AdminTrack>);
     return HttpResponse.json(publicTrack(t));
   }),
+  http.delete('*/api/admin/albums/:id', ({ request, params }) => {
+    if (!isAdmin(request)) return deny();
+    const withTracks = new URL(request.url).searchParams.get('deleteTracks') === 'true';
+    const count = cat.tracks.filter((t) => t.albumId === params.id).length;
+    if (count && !withTracks) return HttpResponse.json({ message: `This album has ${count} tracks.` }, { status: 409 });
+    cat.calls.deleted.push(String(params.id));
+    cat.tracks = cat.tracks.filter((t) => t.albumId !== params.id);
+    cat.albums = cat.albums.filter((a) => a.id !== params.id);
+    return new HttpResponse(null, { status: 204 });
+  }),
   http.delete('*/api/admin/tracks/:id', ({ request, params }) => {
     if (!isAdmin(request)) return deny();
     cat.calls.deleted.push(String(params.id));

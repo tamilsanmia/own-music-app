@@ -17,7 +17,7 @@ import { Role } from '@prisma/client';
 import { Roles } from '../auth/decorators';
 import { AlbumsService } from './albums.service';
 import { ArtistsService } from './artists.service';
-import { AdminAlbumsQuery, CreateAlbumDto, CreateArtistDto, PageQuery, UpdateAlbumDto, UpdateArtistDto } from './dto';
+import { AdminAlbumsQuery, CreateAlbumDto, DeleteAlbumQuery, CreateArtistDto, PageQuery, UpdateAlbumDto, UpdateArtistDto } from './dto';
 import { ImageUpload, requireFile } from './image-upload';
 
 const uuid = new ParseUUIDPipe();
@@ -90,10 +90,11 @@ export class AdminAlbumsController {
     return this.albums.update(id, dto);
   }
 
+  /** 409 if the album has tracks, unless ?deleteTracks=true. */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  delete(@Param('id', uuid) id: string) {
-    return this.albums.delete(id);
+  async delete(@Param('id', uuid) id: string, @Query() q: DeleteAlbumQuery) {
+    await this.albums.delete(id, q.deleteTracks === 'true');
   }
 
   @Put(':id/cover')

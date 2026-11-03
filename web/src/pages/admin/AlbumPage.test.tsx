@@ -202,3 +202,47 @@ describe('AlbumPage track list', () => {
     expect(await screen.findByText('First (Live)')).toBeInTheDocument();
   });
 });
+
+describe('Deleting albums', () => {
+  it('deletes an album with its tracks from the album page, after confirmation', async () => {
+    const { album, artist } = seedAlbum();
+    seedTrack(album.id, 'One', 'READY');
+    seedTrack(album.id, 'Two', 'FAILED');
+    const { user } = renderApp(`/admin/albums/${album.id}`, { as: 'admin' });
+
+    await user.click(await screen.findByRole('button', { name: 'Delete album' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete “Pastel Blues”?' });
+    expect(dialog).toHaveTextContent('its 2 tracks, including the uploaded files');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(cat.albums).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'Delete album' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete album and 2 tracks' }));
+
+    // Back on the artist page, with the album and its tracks gone.
+    expect(await screen.findByDisplayValue(artist.name)).toBeInTheDocument();
+    expect(cat.calls.deleted).toEqual([album.id]);
+    expect(cat.tracks).toEqual([]);
+    expect(await screen.findByText('No albums yet.')).toBeInTheDocument();
+  });
+
+  it('deletes an album from the Albums list', async () => {
+    const { album } = seedAlbum();
+    seedTrack(album.id, 'One', 'READY');
+    const { user } = renderApp('/admin/albums', { as: 'admin' });
+
+    await user.click(await screen.findByRole('button', { name: 'Delete album Pastel Blues' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete album and 1 track' }));
+    expect(await screen.findByText(/No albums yet/)).toBeInTheDocument();
+  });
+
+  it('an empty album deletes with a plain confirmation', async () => {
+    const { album } = seedAlbum();
+    const { user } = renderApp(`/admin/albums/${album.id}`, { as: 'admin' });
+    await user.click(await screen.findByRole('button', { name: 'Delete album' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('This can’t be undone.');
+    await user.click(within(dialog).getByRole('button', { name: 'Delete album' }));
+    await waitFor(() => expect(cat.albums).toEqual([]));
+  });
+});

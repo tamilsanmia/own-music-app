@@ -132,11 +132,56 @@ describe('Catalog', () => {
       await asAdmin(http().get('/api/admin/albums?limit=500')).expect(400);
     });
 
-    it('refuses to delete an album that has tracks', async () => {
+    it('refuses to delete an album that has tracks unless asked to delete them too', async () => {
       const artist = await createArtist();
       const album = await createAlbum(artist.id);
       await addTrack(album.id, artist.id, 1, 'PENDING');
-      await asAdmin(http().delete(`/api/admin/albums/${album.id}`)).expect(409);
+      const res = await asAdmin(http().delete(`/api/admin/albums/${album.id}`)).expect(409);
+      expect(res.body.message).toMatch(/1 tracks/);
+      await asAdmin(http().delete(`/api/admin/albums/${album.id}?deleteTracks=false`)).expect(409);
+      await asAdmin(http().delete(`/api/admin/albums/${album.id}?deleteTracks=yes`)).expect(400);
+      expect(await prisma.track.count()).toBe(1);
+    });
+
+    it('deletes an album with its tracks, files, cover, likes and history', async () => {
+      const { mkdirSync, writeFileSync } = await import('node:fs');
+      const artist = await createArtist();
+      const album = await createAlbum(artist.id);
+      const other = await createAlbum(artist.id, 'Keep Me');
+      await asAdmin(http().put(`/api/admin/albums/${album.id}/cover`)).attach('image', await png(20, 20), 'c.png').expect(200);
+      const a = await addTrack(album.id, artist.id, 1, 'READY');
+      const b = await addTrack(album.id, artist.id, 2, 'READY');
+      const keep = await addTrack(other.id, artist.id, 1, 'READY');
+      for (const t of [a, b, keep]) {
+        await prisma.track.update({ where: { id: t.id }, data: { originalExt: 'mp3' } });
+        mkdirSync(join(MEDIA_ROOT, 'originals'), { recursive: true });
+        writeFileSync(join(MEDIA_ROOT, 'originals', `${t.id}.mp3`), 'audio');
+        mkdirSync(join(MEDIA_ROOT, 'hls', t.id), { recursive: true });
+        writeFileSync(join(MEDIA_ROOT, 'hls', t.id, 'master.m3u8'), '#EXTM3U');
+      }
+      await asListener(http().put(`/api/me/likes/${a.id}`)).expect(204);
+      await asListener(http().post('/api/me/history')).send({ trackId: b.id }).expect(204);
+
+      await asAdmin(http().delete(`/api/admin/albums/${album.id}?deleteTracks=true`)).expect(204);
+
+      expect(await prisma.album.findUnique({ where: { id: album.id } })).toBeNull();
+      expect((await prisma.track.findMany()).map((t) => t.id)).toEqual([keep.id]);
+      expect(await prisma.likedTrack.count()).toBe(0);
+      expect(await prisma.playHistory.count()).toBe(0);
+      expect(coverFiles()).toEqual([]);
+      expect(readdirSync(join(MEDIA_ROOT, 'originals'))).toEqual([`${keep.id}.mp3`]);
+      expect(readdirSync(join(MEDIA_ROOT, 'hls'))).toEqual([keep.id]);
+      // The artist is now deletable once the other album goes too.
+      await asAdmin(http().delete(`/api/admin/albums/${other.id}?deleteTracks=true`)).expect(204);
+      await asAdmin(http().delete(`/api/admin/artists/${artist.id}`)).expect(204);
+    });
+
+    it('deleting an album with tracks is admin-only', async () => {
+      const artist = await createArtist();
+      const album = await createAlbum(artist.id);
+      await addTrack(album.id, artist.id, 1, 'READY');
+      await asListener(http().delete(`/api/admin/albums/${album.id}?deleteTracks=true`)).expect(403);
+      expect(await prisma.track.count()).toBe(1);
     });
   });
 

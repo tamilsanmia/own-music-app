@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { MediaService } from '../media/media.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TranscodeQueue } from '../queue/transcode-queue';
 import { presentAdminTrack } from '../tracks/presenters';
 import type { AdminAlbumsQuery, CreateAlbumDto, UpdateAlbumDto } from './dto';
 import { albumIsVisible, artistRef, presentAlbum, presentTrack, READY } from './presenters';
@@ -13,6 +14,7 @@ export class AlbumsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly media: MediaService,
+    private readonly queue: TranscodeQueue,
   ) {}
 
   // ---- listener reads ----
@@ -89,16 +91,31 @@ export class AlbumsService {
     return presentAlbum(album);
   }
 
-  /** Only albums without tracks can be deleted, so audio files are never orphaned. */
-  async delete(id: string): Promise<void> {
+  /**
+   * Delete an album. If it has tracks, `withTracks` must be set: then its tracks, their likes
+   * and play history, uploaded files, streams and queued jobs go too. Database rows are removed
+   * in one transaction; files are removed afterwards.
+   */
+  async delete(id: string, withTracks = false): Promise<{ deletedTracks: number }> {
     const album = await this.prisma.album.findUnique({
       where: { id },
-      include: { _count: { select: { tracks: true } } },
+      include: { tracks: { select: { id: true, originalExt: true } } },
     });
     if (!album) throw new NotFoundException('Album not found');
-    if (album._count.tracks > 0) throw new ConflictException('Delete the album’s tracks first');
-    await this.prisma.album.delete({ where: { id } });
+    const tracks = album.tracks;
+    if (tracks.length > 0 && !withTracks) {
+      throw new ConflictException(`This album has ${tracks.length} tracks. Delete them too with ?deleteTracks=true`);
+    }
+
+    // Drop waiting transcode jobs first; a job already running notices the track is gone.
+    for (const t of tracks) await this.queue.remove(t.id);
+    await this.prisma.$transaction([
+      this.prisma.track.deleteMany({ where: { albumId: id } }), // likes and history cascade
+      this.prisma.album.delete({ where: { id } }),
+    ]);
+    for (const t of tracks) await this.media.deleteTrackFiles(t.id, t.originalExt);
     await this.media.deleteCover(album.coverId);
+    return { deletedTracks: tracks.length };
   }
 
   async setCover(id: string, file: Buffer) {

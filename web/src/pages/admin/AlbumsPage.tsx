@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { adminKeys, albumsApi } from '@/admin/catalogApi';
 import { Artwork, PageHeader } from '@/admin/components';
+import { DeleteAlbumButton } from '@/admin/DeleteAlbumButton';
 import { errorText, NewAlbumDialog } from '@/admin/dialogs';
 import { FormError } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
@@ -27,6 +28,9 @@ export default function AlbumsPage() {
                 <th className="px-4 py-3 font-semibold">Artist</th>
                 <th className="px-4 py-3 font-semibold">Year</th>
                 <th className="px-4 py-3 font-semibold">Tracks</th>
+                <th className="px-4 py-3">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -45,6 +49,9 @@ export default function AlbumsPage() {
                   </td>
                   <td className="px-4 py-2 text-muted">{a.releaseYear ?? '–'}</td>
                   <td className="px-4 py-2 text-muted">{a.trackCount}</td>
+                  <td className="px-4 py-2 text-right">
+                    <DeleteAlbumButton album={a} trackCount={a.trackCount} compact />
+                  </td>
                 </tr>
               ))}
             </tbody>

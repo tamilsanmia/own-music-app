@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 const trim = () => Transform(({ value }) => (typeof value === 'string' ? value.trim() : value));
 
@@ -89,4 +89,11 @@ export class AdminAlbumsQuery extends PageQuery {
   @IsOptional()
   @IsUUID()
   artistId?: string;
+}
+
+export class DeleteAlbumQuery {
+  /** Also delete the album's tracks and their files. */
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  deleteTracks?: 'true' | 'false';
 }

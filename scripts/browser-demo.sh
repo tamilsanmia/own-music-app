@@ -35,7 +35,8 @@ scp -q "$SCRIPT" "$HOST:/tmp/music-browser-demo.mjs"
 ssh "$HOST" 'rm -rf /tmp/music-browser-demo-assets && mkdir -p /tmp/music-browser-demo-assets'
 if [ -n "$(ls -A "$ASSETS")" ]; then scp -q "$ASSETS"/* "$HOST:/tmp/music-browser-demo-assets/"; fi
 
-ssh "$HOST" bash -s -- "$IMAGE" "$PW_VERSION" "$CLEANUP" <<'REMOTE'
+# ssh joins arguments into one string, so an empty one would vanish: pass "keep" instead.
+ssh "$HOST" bash -s -- "$IMAGE" "$PW_VERSION" "${CLEANUP:-keep}" <<'REMOTE'
 set -uo pipefail
 IMAGE="$1"; PW_VERSION="$2"; CLEANUP="$3"
 OUT=/tmp/music-browser-demo; rm -rf "$OUT"; mkdir -p "$OUT"; chmod 777 "$OUT"

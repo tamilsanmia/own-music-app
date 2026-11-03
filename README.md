@@ -65,12 +65,23 @@ deploy/gen-secrets.sh admin@music.snowsig.in   # once; writes deploy/.env (gitig
 deploy/deploy.sh                               # rsync to /opt/music-app, build, push, apply, wait
 deploy/smoke.sh                                # HTTPS health check + certificate check
 deploy/demo-auth.sh                            # admin login, create listener, check 403/401
-scripts/browser-demo.sh --cleanup              # real-browser walkthrough (Playwright on Dev)
+scripts/browser-demo.sh auth                   # real-browser walkthrough (Playwright on Dev)
+scripts/browser-demo.sh --cleanup catalog      # create artist/album, upload cover + 3 tracks in the UI
 ```
 
 `browser-demo.sh` runs Chromium in the Playwright image on the Dev server, saves screenshots to
-`.data/browser-demo/`, and with `--cleanup` removes the image again. Both demo scripts leave a
-deactivated `*-demo-*@music.snowsig.in` listener behind (there is no delete endpoint yet).
+`.data/browser-demo/`, and with `--cleanup` removes the image again. The auth demos leave a
+deactivated `*-demo-*@music.snowsig.in` listener behind (there is no delete endpoint yet); the
+catalog demo leaves "Browser Demo Artist / Browser Demo Album" with 3 short test tracks.
+
+## Admin pages
+
+Admins see Albums, Artists and Users in the sidebar. The usual flow: **Artists → New artist**
+(add a photo), **New album** (add a cover), then drop audio files onto the album page. Files
+upload one at a time in 4 MiB chunks with a progress bar each, and keep going while you move
+around the admin pages (the browser warns before you close the tab). The track table updates
+by itself while tracks are queued or converting; failed tracks show the ffmpeg error and a
+Retry button. Tracks can be renamed, renumbered, moved up or down, and deleted.
 
 `deploy/demo-catalog.sh` creates an artist and album, uploads a cover, fetches it without a
 login, then deletes both and checks the files are gone (`--keep` leaves them for a look).

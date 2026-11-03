@@ -50,3 +50,8 @@ spec:
             pathType: Prefix
             backend:
               service: { name: api, port: { number: 3000 } }
+          # Everything else is the React app. Traefik prefers the longer prefixes above.
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: web, port: { number: 8080 } }

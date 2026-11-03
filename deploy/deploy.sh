@@ -14,7 +14,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST="${DEPLOY_HOST:-Dev}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/music-app}"
 REGISTRY=localhost:32000
-IMAGES=(server)   # subdirectories with a Dockerfile; web is added in Task 4
+IMAGES=(server web)   # subdirectories with a Dockerfile; image name is music-<dir>
 
 cd "$REPO_ROOT"
 [ -f deploy/.env ] || { echo "deploy/.env missing. Run: deploy/gen-secrets.sh <admin-email>" >&2; exit 1; }

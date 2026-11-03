@@ -4,6 +4,7 @@ describe('validateEnv', () => {
   const base = {
     DATABASE_URL: 'postgresql://u:p@localhost:5432/db',
     JWT_SECRET: 'x'.repeat(32),
+    STREAM_SECRET: 'y'.repeat(32),
   };
 
   it('applies defaults', () => {
@@ -24,7 +25,7 @@ describe('validateEnv', () => {
   });
 
   it('rejects a missing DATABASE_URL', () => {
-    expect(() => validateEnv({ JWT_SECRET: base.JWT_SECRET })).toThrow(/DATABASE_URL/);
+    expect(() => validateEnv({ ...base, DATABASE_URL: undefined })).toThrow(/DATABASE_URL/);
   });
 
   it('rejects a non-postgres DATABASE_URL', () => {

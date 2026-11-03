@@ -7,6 +7,7 @@ import { HealthController } from './health/health.controller';
 import { MediaModule } from './media/media.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { QueueModule } from './queue/transcode-queue';
+import { StreamModule } from './stream/stream.module';
 import { TracksModule } from './tracks/tracks.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { TracksModule } from './tracks/tracks.module';
     PrismaModule,
     MediaModule,
     QueueModule,
+    StreamModule,
     AuthModule,
     CatalogModule,
     TracksModule,

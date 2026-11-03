@@ -26,6 +26,9 @@ export const envSchema = z.object({
   QUEUE_PREFIX: z.string().min(1).default('music'),
 
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  /** HMAC key for stream URLs. Separate from JWT_SECRET so one leaking doesn't expose the other. */
+  STREAM_SECRET: z.string().min(32, 'STREAM_SECRET must be at least 32 characters'),
+  STREAM_TTL_SECONDS: z.coerce.number().int().positive().default(6 * 60 * 60),
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(15 * 60),
   REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
 

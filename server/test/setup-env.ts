@@ -5,6 +5,7 @@ const defaults: Record<string, string> = {
   DATABASE_URL: 'postgresql://music:music@127.0.0.1:5433/music_test?schema=public',
   CORS_ORIGIN: 'http://localhost:5173',
   JWT_SECRET: 'test-jwt-secret-test-jwt-secret-0123456789',
+  STREAM_SECRET: 'test-stream-secret-test-stream-secret-0123',
   ADMIN_EMAIL: 'admin@test.local',
   ADMIN_PASSWORD: 'admin-password-123',
   REDIS_URL: 'redis://127.0.0.1:6380',

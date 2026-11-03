@@ -3,6 +3,7 @@ import { Prisma, Role, User } from '@prisma/client';
 import { PasswordService } from '../auth/password.service';
 import { RefreshTokenService } from '../auth/refresh-token.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ActiveUserCache } from '../stream/active-user.cache';
 
 /** The user fields that are safe to return from the API. */
 export interface PublicUser {
@@ -35,6 +36,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly passwords: PasswordService,
     private readonly refreshTokens: RefreshTokenService,
+    private readonly activeUsers: ActiveUserCache,
   ) {}
 
   findByEmail(email: string): Promise<User | null> {
@@ -97,6 +99,8 @@ export class UsersService {
     if (input.password || input.isActive === false) {
       await this.refreshTokens.revokeAllForUser(id);
     }
+    // Stream links check the active flag through a short cache; make the change take effect now.
+    if (input.isActive !== undefined) this.activeUsers.forget(id);
     return toPublicUser(user);
   }
 

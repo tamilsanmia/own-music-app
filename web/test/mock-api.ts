@@ -99,4 +99,7 @@ export const handlers = [
   }),
 ];
 
-export const server = setupServer(...handlers);
+// mock-catalog.ts reads `db` only inside handlers, so this circular import is safe.
+import { catalogHandlers } from './mock-catalog';
+
+export const server = setupServer(...handlers, ...catalogHandlers);

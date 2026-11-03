@@ -135,6 +135,61 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
   return body as T;
 }
 
+function xhrOnce(
+  method: string,
+  path: string,
+  body: Blob,
+  onProgress?: (loaded: number) => void,
+  signal?: AbortSignal,
+): Promise<{ status: number; body: unknown }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, toUrl(path));
+    if (accessToken) xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.upload.onprogress = (e) => onProgress?.(e.loaded);
+    xhr.onload = () => {
+      let parsed: unknown = xhr.responseText;
+      try {
+        parsed = xhr.responseText ? JSON.parse(xhr.responseText) : undefined;
+      } catch {
+        /* not JSON */
+      }
+      resolve({ status: xhr.status, body: parsed });
+    };
+    xhr.onerror = () => reject(new ApiError(0, 'Network error while uploading'));
+    xhr.onabort = () => reject(new DOMException('Upload cancelled', 'AbortError'));
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true });
+    xhr.send(body);
+  });
+}
+
+/**
+ * Send raw bytes with XMLHttpRequest, because fetch() can't report upload progress.
+ * Same auth handling as api(): one refresh and retry on 401.
+ */
+export async function uploadBytes<T>(
+  path: string,
+  body: Blob,
+  opts: { method?: string; onProgress?: (loaded: number) => void; signal?: AbortSignal } = {},
+): Promise<T> {
+  const method = opts.method ?? 'PUT';
+  let res = await xhrOnce(method, path, body, opts.onProgress, opts.signal);
+  if (res.status === 401) {
+    try {
+      await refreshSession();
+    } catch {
+      sessionExpiredListener?.();
+      throw new ApiError(401, 'Your session has expired. Log in again.');
+    }
+    res = await xhrOnce(method, path, body, opts.onProgress, opts.signal);
+  }
+  if (res.status < 200 || res.status >= 300) {
+    throw new ApiError(res.status, errorMessage(res.status, res.body), res.body);
+  }
+  return res.body as T;
+}
+
 export const authApi = {
   async login(email: string, password: string): Promise<Session> {
     const session = await api<Session>('/api/auth/login', {

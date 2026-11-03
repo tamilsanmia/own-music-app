@@ -1,5 +1,5 @@
-import { Home, LogOut, Music2, UserCog, Users } from 'lucide-react';
-import { Suspense, type ComponentType } from 'react';
+import { Disc3, Home, LogOut, Mic2, Music2, UserCog, Users } from 'lucide-react';
+import { lazy, Suspense, type ComponentType } from 'react';
 import { NavLink, Outlet } from 'react-router';
 import { useAuth } from '@/auth/AuthProvider';
 import { Spinner } from '@/components/ui/spinner';
@@ -23,6 +23,9 @@ function NavItem({ to, icon: Icon, label, end }: { to: string; icon: ComponentTy
   );
 }
 
+// Loaded only for admins, so the upload code stays out of the listener bundle.
+const UploadIndicator = lazy(() => import('@/admin/UploadIndicator'));
+
 export function AppLayout() {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
@@ -41,7 +44,12 @@ export function AppLayout() {
         {isAdmin && (
           <nav aria-label="Admin" className="rounded-lg bg-background p-3">
             <p className="px-3 pb-2 text-xs font-bold uppercase tracking-wider text-muted">Admin</p>
+            <NavItem to="/admin/albums" icon={Disc3} label="Albums" />
+            <NavItem to="/admin/artists" icon={Mic2} label="Artists" />
             <NavItem to="/admin/users" icon={Users} label="Users" />
+            <Suspense fallback={null}>
+              <UploadIndicator />
+            </Suspense>
           </nav>
         )}
 

@@ -32,6 +32,11 @@ export class AdminArtistsController {
     return this.artists.adminList(q);
   }
 
+  @Get(':id')
+  get(@Param('id', uuid) id: string) {
+    return this.artists.adminGet(id);
+  }
+
   @Post()
   create(@Body() dto: CreateArtistDto) {
     return this.artists.create(dto);

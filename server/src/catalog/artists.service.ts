@@ -59,6 +59,15 @@ export class ArtistsService {
     };
   }
 
+  async adminGet(id: string) {
+    const a = await this.prisma.artist.findUnique({
+      where: { id },
+      include: { _count: { select: { albums: true, tracks: true } } },
+    });
+    if (!a) throw new NotFoundException('Artist not found');
+    return { ...presentArtist(a), albumCount: a._count.albums, trackCount: a._count.tracks };
+  }
+
   async create(dto: CreateArtistDto) {
     const artist = await this.prisma.artist.create({ data: { name: dto.name, bio: dto.bio || null } });
     return presentArtist(artist);

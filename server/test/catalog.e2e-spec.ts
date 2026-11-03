@@ -80,6 +80,8 @@ describe('Catalog', () => {
 
       const list = await asAdmin(http().get('/api/admin/artists')).expect(200);
       expect(list.body).toEqual({ items: [{ ...updated.body, bio: null, albumCount: 0, trackCount: 0 }], total: 1 });
+      await asAdmin(http().get(`/api/admin/artists/${artist.id}`)).expect(200, list.body.items[0]);
+      await asListener(http().get(`/api/admin/artists/${artist.id}`)).expect(403);
 
       await asAdmin(http().delete(`/api/admin/artists/${artist.id}`)).expect(204);
       await asAdmin(http().delete(`/api/admin/artists/${artist.id}`)).expect(404);

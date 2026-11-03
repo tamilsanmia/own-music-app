@@ -10,8 +10,12 @@ import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
-// Admin pages are split into their own chunk, so listeners never download them.
+// Admin pages are split into their own chunks, so listeners never download them.
 const UsersPage = lazy(() => import('@/pages/admin/UsersPage'));
+const ArtistsPage = lazy(() => import('@/pages/admin/ArtistsPage'));
+const ArtistPage = lazy(() => import('@/pages/admin/ArtistPage'));
+const AlbumsPage = lazy(() => import('@/pages/admin/AlbumsPage'));
+const AlbumPage = lazy(() => import('@/pages/admin/AlbumPage'));
 
 export function createQueryClient(): QueryClient {
   return new QueryClient({
@@ -43,8 +47,12 @@ export function AppRoutes() {
           <Route index element={<HomePage />} />
           <Route path="account" element={<AccountPage />} />
           <Route path="admin" element={<RequireAdmin />}>
-            <Route index element={<Navigate to="users" replace />} />
+            <Route index element={<Navigate to="albums" replace />} />
             <Route path="users" element={<UsersPage />} />
+            <Route path="artists" element={<ArtistsPage />} />
+            <Route path="artists/:id" element={<ArtistPage />} />
+            <Route path="albums" element={<AlbumsPage />} />
+            <Route path="albums/:id" element={<AlbumPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>

@@ -72,6 +72,9 @@ scripts/browser-demo.sh --cleanup              # real-browser walkthrough (Playw
 `.data/browser-demo/`, and with `--cleanup` removes the image again. Both demo scripts leave a
 deactivated `*-demo-*@music.snowsig.in` listener behind (there is no delete endpoint yet).
 
+`deploy/demo-catalog.sh` creates an artist and album, uploads a cover, fetches it without a
+login, then deletes both and checks the files are gone (`--keep` leaves them for a look).
+
 The admin account (`ADMIN_EMAIL` / `ADMIN_PASSWORD` in `deploy/.env`) is created on the first
 start. Changing those values later does not change the existing account; use
 `PATCH /api/me/password` (or the web app, from Task 4) instead.
@@ -86,3 +89,26 @@ Useful commands on the server:
 microk8s kubectl -n music get pods,ingress,certificate
 microk8s kubectl -n music logs deploy/api
 ```
+
+## API overview
+
+All `/api` routes need `Authorization: Bearer <accessToken>` except `/api/health` and
+`/api/auth/*`. Admin routes (`/api/admin/*`) need the ADMIN role.
+
+| Area | Routes |
+| --- | --- |
+| Auth | `POST /api/auth/login` (`client: "web"` or `"mobile"`), `/refresh`, `/logout` |
+| Me | `GET /api/me`, `PATCH /api/me/password` |
+| Catalog (listeners) | `GET /api/home`, `/api/artists`, `/api/artists/:id`, `/api/albums/:id` |
+| Users (admin) | `GET/POST /api/admin/users`, `PATCH /api/admin/users/:id` |
+| Artists (admin) | `GET/POST /api/admin/artists`, `PATCH/DELETE /api/admin/artists/:id`, `PUT/DELETE /api/admin/artists/:id/image` |
+| Albums (admin) | `GET/POST /api/admin/albums`, `PATCH/DELETE /api/admin/albums/:id`, `PUT/DELETE /api/admin/albums/:id/cover` |
+
+- Listener catalog routes only show albums and artists that have at least one playable
+  (READY) track.
+- Images are uploaded as multipart field `image` (JPEG, PNG, WebP, GIF or AVIF, max 10 MB) and
+  stored as 300 px and 600 px square WebP files. Responses give their paths as
+  `cover: { small, large }` (albums) or `image: { small, large }` (artists), served publicly
+  from `/media/covers/` with a one-year immutable cache.
+- An artist can only be deleted once it has no albums or tracks, and an album once it has no
+  tracks.

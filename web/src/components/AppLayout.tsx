@@ -4,6 +4,7 @@ import { NavLink, Outlet } from 'react-router';
 import { useAuth } from '@/auth/AuthProvider';
 import { Spinner } from '@/components/ui/spinner';
 import { PlayerBar, usePlaybackEngine } from '@/player/PlayerBar';
+import { SidebarPlaylists } from './SidebarPlaylists';
 import { cn } from '@/lib/utils';
 
 function NavItem({ to, icon: Icon, label, end }: { to: string; icon: ComponentType<{ className?: string }>; label: string; end?: boolean }) {
@@ -46,6 +47,8 @@ export function AppLayout() {
           <NavItem to="/liked" icon={Heart} label="Liked Songs" />
         </nav>
 
+        <SidebarPlaylists />
+
         {isAdmin && (
           <nav aria-label="Admin" className="rounded-lg bg-background p-3">
             <p className="px-3 pb-2 text-xs font-bold uppercase tracking-wider text-muted">Admin</p>
@@ -58,7 +61,7 @@ export function AppLayout() {
           </nav>
         )}
 
-        <div className="mt-auto rounded-lg bg-background p-3">
+        <div className="rounded-lg bg-background p-3">
           <p className="truncate px-3 pb-1 text-sm font-semibold" title={user?.email}>
             {user?.displayName}
           </p>

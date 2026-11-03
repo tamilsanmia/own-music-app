@@ -29,6 +29,7 @@ model User {
   refreshTokens RefreshToken[]
   likes         LikedTrack[]
   plays         PlayHistory[]
+  playlists     Playlist[]
 }
 
 /// One row per issued refresh token. Tokens are rotated on every use; all tokens descended from
@@ -95,29 +96,30 @@ enum TrackStatus {
 /// Files: <MEDIA_ROOT>/tmp/<id>.part while uploading, originals/<id>.<originalExt> after,
 /// and hls/<id>/{master.m3u8, 96k/, 160k/, 320k/} once READY.
 model Track {
-  id           String      @id @default(uuid()) @db.Uuid
-  title        String
-  albumId      String      @db.Uuid
-  album        Album       @relation(fields: [albumId], references: [id], onDelete: Restrict)
+  id               String          @id @default(uuid()) @db.Uuid
+  title            String
+  albumId          String          @db.Uuid
+  album            Album           @relation(fields: [albumId], references: [id], onDelete: Restrict)
   /// Usually the album artist; can differ for guest appearances.
-  artistId     String      @db.Uuid
-  artist       Artist      @relation(fields: [artistId], references: [id], onDelete: Restrict)
-  trackNumber  Int
-  durationMs   Int?
-  status       TrackStatus @default(UPLOADING)
-  errorMessage String?
+  artistId         String          @db.Uuid
+  artist           Artist          @relation(fields: [artistId], references: [id], onDelete: Restrict)
+  trackNumber      Int
+  durationMs       Int?
+  status           TrackStatus     @default(UPLOADING)
+  errorMessage     String?
   /// Name of the uploaded file, for the admin's reference.
   originalFilename String?
   /// Lowercase extension of the stored original, e.g. "flac".
-  originalExt  String?
+  originalExt      String?
   /// Declared size of the upload in bytes.
-  sizeBytes    Int?
+  sizeBytes        Int?
   /// Codec, sample rate and channels of the original, from ffprobe.
-  sourceInfo   String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  likes        LikedTrack[]
-  plays        PlayHistory[]
+  sourceInfo       String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  likes            LikedTrack[]
+  plays            PlayHistory[]
+  playlistItems    PlaylistTrack[]
 
   @@index([albumId, trackNumber])
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Track_title_trgm_idx")
@@ -148,4 +150,33 @@ model PlayHistory {
 
   @@index([userId, playedAt])
   @@index([userId, trackId, playedAt])
+}
+
+/// A listener's own playlist. Only the owner can see or change it.
+model Playlist {
+  id          String          @id @default(uuid()) @db.Uuid
+  ownerId     String          @db.Uuid
+  owner       User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  items       PlaylistTrack[]
+
+  @@index([ownerId, updatedAt])
+}
+
+/// One entry in a playlist. The same track may appear more than once, so entries have their
+/// own id. `position` is 0-based and kept contiguous by the service.
+model PlaylistTrack {
+  id         String   @id @default(uuid()) @db.Uuid
+  playlistId String   @db.Uuid
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  trackId    String   @db.Uuid
+  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  position   Int
+  addedAt    DateTime @default(now())
+
+  @@index([playlistId, position])
+  @@index([trackId])
 }

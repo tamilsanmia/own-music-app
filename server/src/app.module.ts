@@ -6,6 +6,7 @@ import { validateEnv } from './config/env';
 import { DiscoverModule } from './discover/discover.module';
 import { HealthController } from './health/health.controller';
 import { MediaModule } from './media/media.module';
+import { PlaylistsModule } from './playlists/playlists.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { QueueModule } from './queue/transcode-queue';
 import { StreamModule } from './stream/stream.module';
@@ -22,6 +23,7 @@ import { TracksModule } from './tracks/tracks.module';
     CatalogModule,
     TracksModule,
     DiscoverModule,
+    PlaylistsModule,
   ],
   controllers: [HealthController],
 })

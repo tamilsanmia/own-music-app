@@ -22,6 +22,9 @@ export const cat = {
   /** userId -> [trackId, playedAt ms] newest last. */
   history: new Map<string, [string, number][]>(),
   failLikes: false,
+  /** Playlists, each with entries of [itemId, trackId]. */
+  playlists: [] as { id: string; owner: string; name: string; description: string | null; items: [string, string][] }[],
+  failPlaylistWrites: false,
   /** Lifetime of stream URLs handed out by the mock. */
   streamTtlMs: 6 * 3600_000,
   /** Called on every GET /api/admin/albums/:id, so tests can move tracks through states. */
@@ -40,6 +43,8 @@ export function resetCatalog(): void {
   cat.likes = new Map();
   cat.history = new Map();
   cat.failLikes = false;
+  cat.playlists = [];
+  cat.failPlaylistWrites = false;
   cat.streamTtlMs = 6 * 3600_000;
   cat.onAlbumGet = undefined;
 }
@@ -208,7 +213,83 @@ export const libraryHandlers = [
   }),
 ];
 
+function presentPlaylist(p: (typeof cat.playlists)[number]) {
+  const items = p.items
+    .map(([itemId, trackId]) => ({ itemId, addedAt: now, track: withAlbum(trackId) }))
+    .filter((i) => i.track);
+  const covers = [...new Set(items.map((i) => i.track!.album.cover).filter(Boolean))].slice(0, 4);
+  return { id: p.id, name: p.name, description: p.description, trackCount: items.length, covers, createdAt: now, updatedAt: now, items };
+}
+function ownPlaylist(request: Request, id: unknown) {
+  return cat.playlists.find((p) => p.id === id && p.owner === callerId(request));
+}
+let itemSeq = 0;
+export function seedPlaylist(owner: string, name: string, trackIds: string[]) {
+  const p = { id: `pl-${++seq}`, owner, name, description: null, items: trackIds.map((t) => [`it-${++itemSeq}`, t] as [string, string]) };
+  cat.playlists.push(p);
+  return p;
+}
+const refuse = () => HttpResponse.json({ message: 'Server error' }, { status: 500 });
+
+export const playlistHandlers = [
+  http.get('*/api/me/playlists', ({ request }) => {
+    if (!isUser(request)) return deny();
+    return HttpResponse.json(
+      cat.playlists.filter((p) => p.owner === callerId(request)).map((p) => {
+        const { items: _items, createdAt: _c, ...summary } = presentPlaylist(p);
+        return summary;
+      }),
+    );
+  }),
+  http.post('*/api/me/playlists', async ({ request }) => {
+    if (!isUser(request)) return deny();
+    const { name } = (await request.json()) as { name: string };
+    const p = seedPlaylist(callerId(request), name, []);
+    return HttpResponse.json(presentPlaylist(p), { status: 201 });
+  }),
+  http.get('*/api/me/playlists/:id', ({ request, params }) => {
+    const p = ownPlaylist(request, params.id);
+    return p ? HttpResponse.json(presentPlaylist(p)) : notFound();
+  }),
+  http.patch('*/api/me/playlists/:id', async ({ request, params }) => {
+    const p = ownPlaylist(request, params.id);
+    if (!p) return notFound();
+    Object.assign(p, (await request.json()) as object);
+    return HttpResponse.json(presentPlaylist(p));
+  }),
+  http.delete('*/api/me/playlists/:id', ({ request, params }) => {
+    if (!ownPlaylist(request, params.id)) return notFound();
+    cat.playlists = cat.playlists.filter((p) => p.id !== params.id);
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.post('*/api/me/playlists/:id/tracks', async ({ request, params }) => {
+    const p = ownPlaylist(request, params.id);
+    if (!p) return notFound();
+    const { trackIds } = (await request.json()) as { trackIds: string[] };
+    p.items.push(...trackIds.map((t) => [`it-${++itemSeq}`, t] as [string, string]));
+    return HttpResponse.json({ added: trackIds.length, skipped: 0 }, { status: 201 });
+  }),
+  http.delete('*/api/me/playlists/:id/tracks/:itemId', ({ request, params }) => {
+    const p = ownPlaylist(request, params.id);
+    if (!p) return notFound();
+    if (cat.failPlaylistWrites) return refuse();
+    p.items = p.items.filter(([itemId]) => itemId !== params.itemId);
+    return HttpResponse.json(presentPlaylist(p));
+  }),
+  http.post('*/api/me/playlists/:id/move', async ({ request, params }) => {
+    const p = ownPlaylist(request, params.id);
+    if (!p) return notFound();
+    if (cat.failPlaylistWrites) return refuse();
+    const { itemId, toIndex } = (await request.json()) as { itemId: string; toIndex: number };
+    const from = p.items.findIndex(([i]) => i === itemId);
+    const [moved] = p.items.splice(from, 1);
+    p.items.splice(toIndex, 0, moved);
+    return HttpResponse.json(presentPlaylist(p));
+  }),
+];
+
 export const catalogHandlers = [
+  ...playlistHandlers,
   ...libraryHandlers,
   ...listenerHandlers,
   http.get('*/api/admin/artists', ({ request }) => {

@@ -27,6 +27,16 @@ HTMLMediaElement.prototype.pause = vi.fn(function (this: HTMLMediaElement) {
 });
 HTMLMediaElement.prototype.load = vi.fn();
 
+// Radix menus measure and capture pointers; jsdom lacks these.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver;
+Element.prototype.hasPointerCapture ??= () => false;
+Element.prototype.releasePointerCapture ??= () => undefined;
+Element.prototype.scrollIntoView ??= () => undefined;
+
 // jsdom has no Media Session API. A small fake that keeps the action handlers for tests.
 class FakeMediaMetadata {
   constructor(init: object) {

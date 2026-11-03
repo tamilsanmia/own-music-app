@@ -39,7 +39,7 @@ echo "track=$TRACK"
 echo "==> Upload in $((CHUNK / 1024 / 1024)) MiB chunks"
 offset=0
 while [ "$offset" -lt "$SIZE" ]; do
-  tail -c +$((offset + 1)) "$FILE" | head -c "$CHUNK" > "$WORK/chunk"
+  dd if="$FILE" of="$WORK/chunk" iflag=skip_bytes,count_bytes skip="$offset" count="$CHUNK" status=none
   offset="$(curl -fsS "${auth[@]}" -X PUT -H 'Content-Type: application/octet-stream' \
     --data-binary @"$WORK/chunk" "$BASE/api/admin/tracks/$TRACK/upload?offset=$offset" | json "['receivedBytes']")"
   echo "  $offset / $SIZE"

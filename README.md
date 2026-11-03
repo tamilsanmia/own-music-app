@@ -102,7 +102,8 @@ All `/api` routes need `Authorization: Bearer <accessToken>` except `/api/health
 | Catalog (listeners) | `GET /api/home`, `/api/artists`, `/api/artists/:id`, `/api/albums/:id` |
 | Users (admin) | `GET/POST /api/admin/users`, `PATCH /api/admin/users/:id` |
 | Artists (admin) | `GET/POST /api/admin/artists`, `PATCH/DELETE /api/admin/artists/:id`, `PUT/DELETE /api/admin/artists/:id/image` |
-| Albums (admin) | `GET/POST /api/admin/albums`, `PATCH/DELETE /api/admin/albums/:id`, `PUT/DELETE /api/admin/albums/:id/cover` |
+| Albums (admin) | `GET/POST /api/admin/albums`, `GET/PATCH/DELETE /api/admin/albums/:id`, `PUT/DELETE /api/admin/albums/:id/cover` |
+| Tracks (admin) | `POST /api/admin/tracks`, `GET/PATCH/DELETE /api/admin/tracks/:id`, `GET/PUT /api/admin/tracks/:id/upload`, `POST /api/admin/tracks/:id/upload/complete`, `POST /api/admin/tracks/:id/retry` |
 
 - Listener catalog routes only show albums and artists that have at least one playable
   (READY) track.
@@ -112,3 +113,25 @@ All `/api` routes need `Authorization: Bearer <accessToken>` except `/api/health
   from `/media/covers/` with a one-year immutable cache.
 - An artist can only be deleted once it has no albums or tracks, and an album once it has no
   tracks.
+
+### Uploading tracks
+
+Uploads are chunked so that no single request runs into Traefik's 60-second timeout:
+
+1. `POST /api/admin/tracks` with `{ albumId, filename, sizeBytes, title?, trackNumber?, artistId? }`.
+   Title defaults to the file name without extension, track number to the next free one on
+   the album. The response has the track (status `UPLOADING`) and `upload.chunkBytes` (4 MiB).
+2. `PUT /api/admin/tracks/:id/upload?offset=N` with the raw bytes
+   (`Content-Type: application/octet-stream`, at most 16 MiB). `offset` must equal the bytes
+   received so far; on a mismatch the 409 response includes `receivedBytes`.
+   `GET /api/admin/tracks/:id/upload` also reports it, so an interrupted upload can resume.
+3. `POST /api/admin/tracks/:id/upload/complete`. ffprobe checks the file. Non-audio files are
+   discarded (400); audio becomes `PENDING` and is queued.
+
+The worker (`node dist/worker.js`, Deployment `worker`) then transcodes one track at a time:
+`PROCESSING`, then `READY` with `hls/<id>/master.m3u8` plus `96k/`, `160k/`, `320k/`
+(AAC in fMP4 segments of 6 s), or `FAILED` with `errorMessage` after 3 attempts.
+`POST .../retry` re-queues a failed track. A 3-minute MP3 takes about 45 s, and the HLS output
+is about 1.6 times the size of a 320 kbps original.
+
+`deploy/demo-upload.sh [file]` runs the whole flow against production and prints the result.

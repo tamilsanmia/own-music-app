@@ -113,6 +113,8 @@ All `/api` routes need `Authorization: Bearer <accessToken>` except `/api/health
 | Me | `GET /api/me`, `PATCH /api/me/password` |
 | Catalog (listeners) | `GET /api/home`, `/api/artists`, `/api/artists/:id`, `/api/albums/:id` |
 | Streaming | `GET /api/tracks/:id/stream-url`, then `GET /stream/<token>/<id>/master.m3u8` (no auth header) |
+| Search | `GET /api/search?q=` → `{ tracks, albums, artists }` |
+| Library | `GET /api/me/likes`, `GET /api/me/likes/ids`, `PUT/DELETE /api/me/likes/:trackId`, `POST /api/me/history`, `GET /api/me/recent` |
 | Users (admin) | `GET/POST /api/admin/users`, `PATCH /api/admin/users/:id` |
 | Artists (admin) | `GET/POST /api/admin/artists`, `PATCH/DELETE /api/admin/artists/:id`, `PUT/DELETE /api/admin/artists/:id/image` |
 | Albums (admin) | `GET/POST /api/admin/albums`, `GET/PATCH/DELETE /api/admin/albums/:id`, `PUT/DELETE /api/admin/albums/:id/cover` |
@@ -186,3 +188,20 @@ lock screen work through the Media Session API.
 
 Unit tests use a fake hls.js. Playwright's bundled Chromium can't decode AAC, so the real
 playback check (`scripts/browser-demo.sh player`) runs Google Chrome.
+
+### Search, liked songs and recently played
+
+- **Search** uses Postgres `pg_trgm` with GIN indexes on track and album titles and artist
+  names. It matches substrings in any case and tolerates about one typo per word ("secnd wind").
+  Exact titles rank first, then titles starting with the query, then the closest matches.
+  Songs and albums also match on the artist's name, ranked below title matches. Only playable
+  music is returned.
+- **Likes** are idempotent (`PUT` twice or `DELETE` twice is fine). `GET /api/me/likes/ids`
+  returns every liked id so clients can draw hearts anywhere. Likes are removed with the track.
+- **History**: the client sends `POST /api/me/history` after 30 s of actual listening (half
+  the length for songs under a minute; seeking doesn't count). `playedAt` may be up to 30 days
+  in the past so offline plays can be sent later, and two reports for the same track within
+  30 s count once. `GET /api/me/recent` lists the last 20 different tracks.
+
+`deploy/demo-discover.sh` runs searches, likes and unlikes two songs, and records a play as
+the admin.

@@ -126,8 +126,12 @@ All `/api` routes need `Authorization: Bearer <accessToken>` except `/api/health
   stored as 300 px and 600 px square WebP files. Responses give their paths as
   `cover: { small, large }` (albums) or `image: { small, large }` (artists), served publicly
   from `/media/covers/` with a one-year immutable cache.
-- An artist can only be deleted once it has no albums or tracks, and an album once it has no
-  tracks.
+- An artist can only be deleted once it has no albums or tracks. An album with tracks is
+  deleted with `DELETE /api/admin/albums/:id?deleteTracks=true`, which also removes its tracks,
+  their uploaded files, streams, likes and play history (without the flag it returns 409). In
+  the web app, use **Delete album** on the album page or the trash icon in the Albums list.
+- `deploy/admin-api.sh catalog` lists artists and albums on production;
+  `deploy/admin-api.sh call METHOD PATH [JSON]` makes one-off admin API calls.
 
 ### Uploading tracks
 

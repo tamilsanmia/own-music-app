@@ -30,6 +30,7 @@ import snowsig.music.ui.components.Loading
 import snowsig.music.ui.components.LocalNavigator
 import snowsig.music.ui.components.TrackRow
 import snowsig.music.ui.components.songsSummary
+import snowsig.music.ui.downloads.DownloadAllButton
 import snowsig.music.ui.home.ErrorBox
 import snowsig.music.ui.player.PlayerViewModel
 import javax.inject.Inject
@@ -77,6 +78,7 @@ fun AlbumScreen(contentPadding: PaddingValues, vm: AlbumViewModel = hiltViewMode
                         onPlay = if (queue.isEmpty()) null else ({ if (playingHere) player.togglePlay() else player.play(queue, 0) }),
                         playing = playingHere,
                         playLabel = "album",
+                        actions = { DownloadAllButton(queue, album.title) },
                     )
                 }
                 itemsIndexed(queue, key = { _, t -> t.id }) { i, t ->

@@ -22,7 +22,7 @@ import snowsig.music.data.auth.KeystoreTokenStore
 import snowsig.music.data.auth.SessionManager
 import snowsig.music.data.auth.TokenAuthenticator
 import snowsig.music.data.auth.TokenStore
-import snowsig.music.playback.ApiPlayReporter
+import snowsig.music.offline.QueuedPlayReporter
 import snowsig.music.playback.PlayReporter
 import java.util.concurrent.TimeUnit
 import javax.inject.Named
@@ -41,7 +41,7 @@ abstract class BindingsModule {
     abstract fun tokenStore(impl: KeystoreTokenStore): TokenStore
 
     @Binds
-    abstract fun playReporter(impl: ApiPlayReporter): PlayReporter
+    abstract fun playReporter(impl: QueuedPlayReporter): PlayReporter
 }
 
 @Module

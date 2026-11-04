@@ -58,6 +58,7 @@ import snowsig.music.ui.components.PlaylistCover
 import snowsig.music.ui.components.SectionTitle
 import snowsig.music.ui.components.TrackRow
 import snowsig.music.ui.components.songsSummary
+import snowsig.music.ui.downloads.DownloadAllButton
 import snowsig.music.ui.home.ErrorBox
 import snowsig.music.ui.player.PlayerViewModel
 import javax.inject.Inject
@@ -213,6 +214,7 @@ fun LikedScreen(contentPadding: PaddingValues, vm: LikedViewModel = hiltViewMode
                         onPlay = if (queue.isEmpty()) null else ({ if (playingHere) player.togglePlay() else player.play(queue, 0) }),
                         playing = playingHere,
                         playLabel = "Liked Songs",
+                        actions = { DownloadAllButton(queue, "Liked Songs") },
                     )
                 }
                 if (queue.isEmpty()) item { EmptyNote("Songs you like appear here. Tap the heart next to any song.") }

@@ -1,6 +1,8 @@
 package snowsig.music
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -12,10 +14,16 @@ import javax.inject.Inject
 import javax.inject.Named
 
 @HiltAndroidApp
-class MusicApp : Application(), SingletonImageLoader.Factory {
+class MusicApp : Application(), SingletonImageLoader.Factory, Configuration.Provider {
     @Inject
     @Named("plain")
     lateinit var httpClient: OkHttpClient
+
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
     /** Cover images are public (unguessable URLs), so Coil uses the plain client. */
     override fun newImageLoader(context: PlatformContext): ImageLoader = ImageLoader.Builder(context)

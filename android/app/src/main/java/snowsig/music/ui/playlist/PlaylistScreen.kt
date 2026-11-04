@@ -46,6 +46,7 @@ import snowsig.music.ui.components.PlaylistCover
 import snowsig.music.ui.components.TrackMenuItem
 import snowsig.music.ui.components.TrackRow
 import snowsig.music.ui.components.songsSummary
+import snowsig.music.ui.downloads.DownloadAllButton
 import snowsig.music.ui.home.ErrorBox
 import snowsig.music.ui.player.PlayerViewModel
 import javax.inject.Inject
@@ -146,6 +147,7 @@ fun PlaylistScreen(
                         playing = playingHere,
                         playLabel = p.name,
                         actions = {
+                            DownloadAllButton(queue, p.name)
                             IconButton(onClick = { renaming = true }) { Icon(Icons.Filled.Edit, "Rename playlist") }
                             IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.Delete, "Delete playlist") }
                         },

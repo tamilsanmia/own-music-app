@@ -39,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -46,7 +47,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import snowsig.music.offline.DownloadStatus
 import snowsig.music.playback.QueueTrack
+import snowsig.music.ui.downloads.DownloadMarker
+import snowsig.music.ui.downloads.DownloadsViewModel
 import snowsig.music.ui.player.formatTime
 import snowsig.music.ui.theme.MusicColors
 
@@ -84,11 +88,21 @@ fun TrackRow(
     showArt: Boolean = false,
     showArtist: Boolean = true,
     extraMenu: List<TrackMenuItem> = emptyList(),
+    downloads: DownloadsViewModel = hiltViewModel(),
 ) {
+    val items by downloads.items.collectAsStateWithLifecycle()
+    val online by downloads.online.collectAsStateWithLifecycle()
+    val download = items[track.id]
+    val available = online || download?.status == DownloadStatus.Done
+    val downloadMenu = when (download?.status) {
+        null, DownloadStatus.Failed -> TrackMenuItem("Download") { downloads.download(listOf(track)) }
+        else -> TrackMenuItem("Remove download") { downloads.remove(track.id) }
+    }
     Row(
         modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .alpha(if (available) 1f else 0.4f)
+            .clickable(enabled = available, onClick = onClick)
             .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
             .semantics { contentDescription = "Play ${track.title}" },
         verticalAlignment = Alignment.CenterVertically,
@@ -114,12 +128,16 @@ fun TrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
             val sub = listOfNotNull(track.artist.name.takeIf { showArtist }, track.durationMs?.let(::formatTime)).joinToString(" · ")
-            if (sub.isNotEmpty()) {
-                Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                DownloadMarker(track.id, downloads)
+                if (download != null) Spacer(Modifier.width(6.dp))
+                if (sub.isNotEmpty()) {
+                    Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
         LikeButton(track.id, track.title)
-        TrackMenu(track, extraMenu)
+        TrackMenu(track, listOf(downloadMenu) + extraMenu)
     }
 }
 

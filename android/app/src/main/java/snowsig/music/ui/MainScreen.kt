@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -63,6 +64,8 @@ import snowsig.music.ui.components.Artwork
 import snowsig.music.ui.components.LikeButton
 import snowsig.music.ui.components.LocalNavigator
 import snowsig.music.ui.components.TrackActionsViewModel
+import snowsig.music.ui.downloads.DownloadsScreen
+import snowsig.music.ui.downloads.OfflineBanner
 import snowsig.music.ui.home.HomeScreen
 import snowsig.music.ui.library.LibraryScreen
 import snowsig.music.ui.library.LikedScreen
@@ -79,6 +82,7 @@ import snowsig.music.ui.search.SearchScreen
 @Serializable data class AlbumRoute(val id: String)
 @Serializable data class ArtistRoute(val id: String)
 @Serializable data class PlaylistRoute(val id: String)
+@Serializable object DownloadsRoute
 
 enum class Tab(val label: String, val icon: ImageVector, val route: Any) {
     Home("Home", Icons.Filled.Home, HomeRoute),
@@ -126,7 +130,6 @@ fun MainScreen(
     user: UserDto,
     player: PlayerViewModel = hiltViewModel(),
     actions: TrackActionsViewModel = hiltViewModel(),
-    extraRoutes: ExtraRoutes = ExtraRoutes(),
 ) {
     RequestNotificationPermission()
     val nav = rememberNavController()
@@ -150,6 +153,7 @@ fun MainScreen(
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 snackbarHost = { SnackbarHost(snackbar) },
+                topBar = { Column(Modifier.statusBarsPadding()) { OfflineBanner(onOpenDownloads = { nav.navigate(DownloadsRoute) }) } },
                 bottomBar = {
                     Column {
                         MiniPlayer(playerState, onOpen = { nowPlaying = true }, onToggle = player::togglePlay, trailing = {
@@ -171,13 +175,13 @@ fun MainScreen(
                     }
                     composable<SearchRoute> { SearchScreen(inner) }
                     composable<LibraryRoute> {
-                        LibraryScreen(inner, onOpenLiked = { nav.navigate(LikedRoute) }, onOpenDownloads = extraRoutes.openDownloads?.let { { it(nav) } })
+                        LibraryScreen(inner, onOpenLiked = { nav.navigate(LikedRoute) }, onOpenDownloads = { nav.navigate(DownloadsRoute) })
                     }
                     composable<LikedRoute> { LikedScreen(inner) }
                     composable<AlbumRoute> { AlbumScreen(inner) }
                     composable<ArtistRoute> { ArtistScreen(inner) }
                     composable<PlaylistRoute> { PlaylistScreen(inner, onDeleted = { nav.popBackStack() }) }
-                    extraRoutes.register(this, inner)
+                    composable<DownloadsRoute> { DownloadsScreen(inner) }
                 }
             }
             AnimatedVisibility(
@@ -192,12 +196,6 @@ fun MainScreen(
         }
     }
 }
-
-/** Hook for screens added by later features (downloads), without growing this file's signature. */
-class ExtraRoutes(
-    val openDownloads: ((NavHostController) -> Unit)? = null,
-    val register: androidx.navigation.NavGraphBuilder.(PaddingValues) -> Unit = {},
-)
 
 /** "Recently played" tiles on Home. Tapping one plays the row from there. */
 @Composable

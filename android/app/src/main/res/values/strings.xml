@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Music</string>
+    <string name="downloads_channel">Downloads</string>
+    <string name="downloads_channel_description">Progress of songs downloading for offline listening</string>
+    <plurals name="downloading_songs">
+        <item quantity="one">Downloading %d song</item>
+        <item quantity="other">Downloading %d songs</item>
+    </plurals>
 </resources>

@@ -11,8 +11,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
-import androidx.media3.datasource.ResolvingDataSource
-import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.datasource.DataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
@@ -20,8 +19,8 @@ import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.AndroidEntryPoint
-import okhttp3.OkHttpClient
 import snowsig.music.MainActivity
+import snowsig.music.offline.DownloadsRepository
 import javax.inject.Inject
 import javax.inject.Named
 
@@ -35,7 +34,8 @@ import javax.inject.Named
 class PlaybackService : MediaSessionService() {
     @Inject lateinit var streamUrls: StreamUrls
     @Inject lateinit var playReporter: PlayReporter
-    @Inject @Named("plain") lateinit var httpClient: OkHttpClient
+    @Inject @Named("playback") lateinit var dataSource: DataSource.Factory
+    @Inject lateinit var downloads: DownloadsRepository
 
     private var session: MediaSession? = null
     private lateinit var player: ExoPlayer
@@ -45,7 +45,6 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        val dataSource = ResolvingDataSource.Factory(OkHttpDataSource.Factory(httpClient), StreamResolver(streamUrls))
         player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
             .setAudioAttributes(
@@ -88,13 +87,22 @@ class PlaybackService : MediaSessionService() {
     }
 
     private val callback = object : MediaSession.Callback {
-        /** Items from controllers arrive without their URI; restore it from the media id. */
+        /**
+         * Items from controllers arrive without their URI; restore it from the media id.
+         * Downloaded songs are limited to the downloaded rendition, so they play from the phone.
+         */
         override fun onAddMediaItems(
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
             mediaItems: MutableList<MediaItem>,
         ): ListenableFuture<MutableList<MediaItem>> =
-            Futures.immediateFuture(mediaItems.map { it.withPlayableUri() }.toMutableList())
+            Futures.immediateFuture(
+                mediaItems.map { item ->
+                    val playable = item.withPlayableUri()
+                    val download = downloads.completedRequest(item.mediaId)
+                    if (download != null) playable.buildUpon().setStreamKeys(download.streamKeys).build() else playable
+                }.toMutableList(),
+            )
     }
 
     private val listener = object : Player.Listener {

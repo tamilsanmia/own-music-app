@@ -97,7 +97,7 @@ describe('Track upload and transcoding', () => {
       expect(status.body).toEqual({ status: 'UPLOADING', receivedBytes: fx.wavBytes.length, sizeBytes: fx.wavBytes.length });
 
       const done = await complete().expect(200);
-      expect(done.body).toMatchObject({ status: 'PENDING', sourceInfo: 'pcm_s16le · 44.1 kHz · stereo' });
+      expect(done.body).toMatchObject({ status: 'PENDING', sourceInfo: 'pcm_s16le · 44.1 kHz · 16-bit · stereo' });
       expect(done.body.durationMs).toBeGreaterThanOrEqual(4990);
 
       expect(ls('originals')).toEqual([`${id}.wav`]);
@@ -227,10 +227,13 @@ describe('Track upload and transcoding', () => {
       await complete().expect(200);
       const track = await waitForStatus(id, ['READY', 'FAILED']);
       expect([track.status, track.errorMessage]).toEqual(['READY', null]);
+      // WAV is lossless, so a FLAC stream is made next to the AAC variants.
+      expect(track.lossless).toBe(true);
 
-      expect(ls(`hls/${id}`)).toEqual(['160k', '320k', '96k', 'master.m3u8']);
+      expect(ls(`hls/${id}`)).toEqual(['160k', '320k', '96k', 'flac', 'lossless.m3u8', 'master.m3u8']);
       const master = readFileSync(join(MEDIA, 'hls', id, 'master.m3u8'), 'utf8');
       expect(master.match(/#EXT-X-STREAM-INF/g)).toHaveLength(3);
+      expect(master).not.toContain('flac');
       expect(ls('tmp').filter((f) => f.includes(id))).toEqual([]);
 
       const album = await asListener(http().get(`/api/albums/${albumId}`)).expect(200);

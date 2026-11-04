@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { adminKeys, albumsApi, type AdminAlbumDetail } from '@/admin/catalogApi';
+import { adminKeys, albumsApi, genresApi, parseGenres, type AdminAlbumDetail } from '@/admin/catalogApi';
 import { ImageEditor } from '@/admin/components';
 import { adminConfig } from '@/admin/config';
 import { DeleteAlbumButton } from '@/admin/DeleteAlbumButton';
@@ -16,16 +16,53 @@ import { ApiError } from '@/lib/api';
 
 const BUSY = new Set(['PENDING', 'PROCESSING']);
 
+/** Comma-separated genres, with the catalog's existing genres as one-click suggestions. */
+function GenresField({ value, onChange }: { value: string; onChange(v: string): void }) {
+  const names = useQuery({ queryKey: adminKeys.genres, queryFn: genresApi.names });
+  const chosen = new Set(parseGenres(value).map((g) => g.toLowerCase()));
+  const suggestions = (names.data ?? []).filter((g) => !chosen.has(g.toLowerCase()));
+  const add = (g: string) => onChange([...parseGenres(value), g].join(', '));
+  return (
+    <Field label="Genres or moods" htmlFor="edit-album-genres" hint="Up to 5, separated by commas. Listeners can browse by these.">
+      <Input
+        id="edit-album-genres"
+        name="genres"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Melody, Kuthu"
+      />
+      {suggestions.length > 0 && (
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Add an existing genre">
+          {suggestions.slice(0, 20).map((g) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => add(g)}
+              className="rounded-full border border-border px-2 py-0.5 text-xs text-muted hover:text-foreground"
+            >
+              + {g}
+            </button>
+          ))}
+        </div>
+      )}
+    </Field>
+  );
+}
+
 function AlbumForm({ album }: { album: AdminAlbumDetail }) {
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
+  const [genres, setGenres] = useState(album.genres.join(', '));
   const save = useMutation({
-    mutationFn: (input: { title: string; artistId: string; releaseYear: number | null }) => albumsApi.update(album.id, input),
-    onSuccess: () => {
+    mutationFn: (input: { title: string; artistId: string; releaseYear: number | null; genres: string[] }) =>
+      albumsApi.update(album.id, input),
+    onSuccess: (updated) => {
       setSaved(true);
+      setGenres(updated.genres.join(', '));
       void queryClient.invalidateQueries({ queryKey: adminKeys.album(album.id) });
       void queryClient.invalidateQueries({ queryKey: adminKeys.allAlbums });
       void queryClient.invalidateQueries({ queryKey: adminKeys.artists });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.genres });
     },
   });
 
@@ -37,6 +74,7 @@ function AlbumForm({ album }: { album: AdminAlbumDetail }) {
       title: String(form.get('title')).trim(),
       artistId: String(form.get('artistId')),
       releaseYear: parseYear(form.get('releaseYear')) ?? null,
+      genres: parseGenres(genres),
     });
   }
 
@@ -53,6 +91,7 @@ function AlbumForm({ album }: { album: AdminAlbumDetail }) {
           <Input id="edit-album-year" name="releaseYear" type="number" min={1000} max={2100} defaultValue={album.releaseYear ?? ''} />
         </Field>
       </div>
+      <GenresField value={genres} onChange={setGenres} />
       <FormError message={errorText(save.error)} />
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={save.isPending}>

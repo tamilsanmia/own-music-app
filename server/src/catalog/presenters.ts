@@ -16,6 +16,7 @@ type AlbumRow = {
   title: string;
   releaseYear: number | null;
   coverId: string | null;
+  genres?: string[] | null;
   createdAt: Date;
   artist: { id: string; name: string };
 };
@@ -24,6 +25,8 @@ type TrackRow = {
   title: string;
   trackNumber: number;
   durationMs: number | null;
+  lossless?: boolean;
+  lyrics?: string | null;
   artist: { id: string; name: string };
 };
 
@@ -38,6 +41,7 @@ export function presentAlbum(a: AlbumRow) {
     releaseYear: a.releaseYear,
     artist: a.artist,
     cover: coverUrls(a.coverId),
+    genres: a.genres ?? [],
     createdAt: a.createdAt,
   };
 }
@@ -64,5 +68,8 @@ export function presentTrack(t: TrackRow) {
     trackNumber: t.trackNumber,
     durationMs: t.durationMs,
     artist: t.artist,
+    /** Lyrics themselves come from GET /api/tracks/:id/lyrics. */
+    hasLyrics: !!t.lyrics,
+    lossless: t.lossless ?? false,
   };
 }

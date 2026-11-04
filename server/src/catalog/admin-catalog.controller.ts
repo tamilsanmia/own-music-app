@@ -18,6 +18,7 @@ import { Roles } from '../auth/decorators';
 import { AlbumsService } from './albums.service';
 import { ArtistsService } from './artists.service';
 import { AdminAlbumsQuery, CreateAlbumDto, DeleteAlbumQuery, CreateArtistDto, PageQuery, UpdateAlbumDto, UpdateArtistDto } from './dto';
+import { GenresService } from './genres.service';
 import { ImageUpload, requireFile } from './image-upload';
 
 const uuid = new ParseUUIDPipe();
@@ -106,5 +107,17 @@ export class AdminAlbumsController {
   @Delete(':id/cover')
   removeCover(@Param('id', uuid) id: string) {
     return this.albums.removeCover(id);
+  }
+}
+
+/** Every genre name in use, for suggestions in the admin's album form. */
+@Roles(Role.ADMIN)
+@Controller('admin/genres')
+export class AdminGenresController {
+  constructor(private readonly genres: GenresService) {}
+
+  @Get()
+  list() {
+    return this.genres.allNames();
   }
 }

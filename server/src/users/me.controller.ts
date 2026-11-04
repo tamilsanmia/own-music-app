@@ -6,6 +6,7 @@ import { AuthUser, CurrentUser } from '../auth/decorators';
 import { ChangePasswordDto } from '../auth/dto';
 import { sendSession } from '../auth/session-response';
 import type { Env } from '../config/env';
+import { UpdateProfileDto } from './dto';
 import { toPublicUser, UsersService } from './users.service';
 
 @Controller('me')
@@ -24,6 +25,13 @@ export class MeController {
   async me(@CurrentUser() current: AuthUser) {
     const user = await this.users.findById(current.id);
     if (!user) throw new NotFoundException();
+    return toPublicUser(user);
+  }
+
+  /** Change your own display name. */
+  @Patch()
+  async updateProfile(@CurrentUser() current: AuthUser, @Body() dto: UpdateProfileDto) {
+    const user = await this.users.updateOwnProfile(current.id, dto.displayName);
     return toPublicUser(user);
   }
 

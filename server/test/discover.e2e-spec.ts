@@ -60,6 +60,8 @@ describe('Search, likes and history', () => {
         durationMs: 200000,
         artist: { id: ids.miles, name: 'Miles Davis' },
         album: { id: ids.kind, title: 'Kind of Blue', cover: null },
+        hasLyrics: false,
+        lossless: false,
       });
     });
 

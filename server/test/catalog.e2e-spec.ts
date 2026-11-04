@@ -312,6 +312,8 @@ describe('Catalog', () => {
         trackNumber: 1,
         durationMs: 180000,
         artist: { id: expect.any(String), name: 'Nina Simone' },
+        hasLyrics: false,
+        lossless: false,
       });
       await asListener(http().get(`/api/albums/${draft.id}`)).expect(404);
       await asListener(http().get('/api/albums/00000000-0000-4000-8000-000000000000')).expect(404);

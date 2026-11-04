@@ -1,7 +1,38 @@
+import { applyDecorators } from '@nestjs/common';
 import { Transform, Type } from 'class-transformer';
-import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  ValidateIf,
+} from 'class-validator';
 
 const trim = () => Transform(({ value }) => (typeof value === 'string' ? value.trim() : value));
+
+export const MAX_GENRES = 5;
+export const MAX_GENRE_LENGTH = 40;
+
+/** Up to 5 genres or moods per album, each 1-40 characters, trimmed. */
+const genres = () =>
+  applyDecorators(
+    Transform(({ value }) =>
+      Array.isArray(value) ? value.map((g) => (typeof g === 'string' ? g.trim().replace(/\s+/g, ' ') : g)) : value,
+    ),
+    IsOptional(),
+    IsArray(),
+    ArrayMaxSize(MAX_GENRES),
+    IsString({ each: true }),
+    IsNotEmpty({ each: true }),
+    MaxLength(MAX_GENRE_LENGTH, { each: true }),
+  );
 
 export class CreateArtistDto {
   @trim()
@@ -48,6 +79,9 @@ export class CreateAlbumDto {
   @Min(1000)
   @Max(2100)
   releaseYear?: number;
+
+  @genres()
+  genres?: string[];
 }
 
 export class UpdateAlbumDto {
@@ -68,6 +102,10 @@ export class UpdateAlbumDto {
   @Min(1000)
   @Max(2100)
   releaseYear?: number | null;
+
+  /** Replaces the list; [] removes all genres. */
+  @genres()
+  genres?: string[];
 }
 
 export class PageQuery {

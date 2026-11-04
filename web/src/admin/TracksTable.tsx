@@ -1,14 +1,75 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Pencil, RotateCcw, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, MicVocal, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmButton } from '@/components/ui/confirm-dialog';
+import { Textarea } from '@/components/ui/controls';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Field, FormError, Input } from '@/components/ui/input';
 import { formatBytes, formatDuration } from '@/lib/format';
 import { adminKeys, tracksApi, type AdminTrack } from './catalogApi';
 import { TrackStatusBadge } from './components';
 import { errorText } from './dialogs';
+
+const MAX_LYRICS = 20_000;
+const LRC_LINE = /^\s*\[\d{1,3}:\d{2}(?:[.:]\d{1,3})?\]/m;
+
+function LyricsDialog({ track, onClose }: { track: AdminTrack; onClose(): void }) {
+  const queryClient = useQueryClient();
+  const [text, setText] = useState(track.lyrics ?? '');
+  const save = useMutation({
+    mutationFn: (lyrics: string | null) => tracksApi.update(track.id, { lyrics }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: adminKeys.album(track.albumId) });
+      onClose();
+    },
+  });
+  const synced = LRC_LINE.test(text);
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Lyrics</DialogTitle>
+          <DialogDescription>{track.title}</DialogDescription>
+        </DialogHeader>
+        <form
+          className="grid gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save.mutate(text.trim() === '' ? null : text);
+          }}
+        >
+          <Field
+            label="Lyrics text"
+            htmlFor="track-lyrics"
+            hint="Plain text, or LRC for lyrics that follow the music: one line per lyric starting with a time, like [01:23.45]."
+          >
+            <Textarea
+              id="track-lyrics"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={MAX_LYRICS}
+              rows={14}
+              className="font-mono text-xs"
+              placeholder={'[00:12.00] First line\n[00:17.50] Second line'}
+            />
+          </Field>
+          <p className="text-xs text-muted" role="status">
+            {text.trim() === '' ? 'No lyrics' : synced ? 'Synced lyrics (LRC)' : 'Plain lyrics'} · {text.length.toLocaleString()} /{' '}
+            {MAX_LYRICS.toLocaleString()} characters
+          </p>
+          <FormError message={errorText(save.error)} />
+          <DialogFooter>
+            <Button type="submit" disabled={save.isPending}>
+              {save.isPending ? 'Saving…' : 'Save lyrics'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function EditTrackDialog({ track, onClose }: { track: AdminTrack; onClose(): void }) {
   const queryClient = useQueryClient();
@@ -55,6 +116,7 @@ function EditTrackDialog({ track, onClose }: { track: AdminTrack; onClose(): voi
 export function TracksTable({ albumId, tracks, uploadingIds }: { albumId: string; tracks: AdminTrack[]; uploadingIds: Set<string> }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<AdminTrack | null>(null);
+  const [lyricsFor, setLyricsFor] = useState<AdminTrack | null>(null);
   const refresh = () => queryClient.invalidateQueries({ queryKey: adminKeys.album(albumId) });
 
   const retry = useMutation({ mutationFn: tracksApi.retry, onSuccess: refresh });
@@ -103,7 +165,11 @@ export function TracksTable({ albumId, tracks, uploadingIds }: { albumId: string
                 </td>
                 <td className="px-4 py-3 text-muted">{formatDuration(t.durationMs)}</td>
                 <td className="px-4 py-3" aria-label={`Status of ${t.title}`}>
-                  <TrackStatusBadge status={t.status} />
+                  <div className="flex flex-wrap gap-1">
+                    <TrackStatusBadge status={t.status} />
+                    {t.lossless && <Badge variant="outline">Lossless</Badge>}
+                    {t.lyrics && <Badge variant="outline">Lyrics</Badge>}
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-1">
@@ -117,6 +183,9 @@ export function TracksTable({ albumId, tracks, uploadingIds }: { albumId: string
                     </Button>
                     <Button size="icon" variant="ghost" className="size-8" onClick={() => setEditing(t)} aria-label={`Edit ${t.title}`}>
                       <Pencil aria-hidden />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="size-8" onClick={() => setLyricsFor(t)} aria-label={`Lyrics of ${t.title}`}>
+                      <MicVocal aria-hidden />
                     </Button>
                     {t.status === 'FAILED' && (
                       <Button size="sm" variant="secondary" disabled={retry.isPending}
@@ -144,6 +213,7 @@ export function TracksTable({ albumId, tracks, uploadingIds }: { albumId: string
       {retry.error && <FormError message={errorText(retry.error)} />}
       {move.error && <FormError message={errorText(move.error)} />}
       {editing && <EditTrackDialog track={editing} onClose={() => setEditing(null)} />}
+      {lyricsFor && <LyricsDialog track={lyricsFor} onClose={() => setLyricsFor(null)} />}
     </>
   );
 }

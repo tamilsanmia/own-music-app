@@ -73,12 +73,15 @@ model Album {
   releaseYear Int?
   /// Cover files live at <MEDIA_ROOT>/covers/<coverId>-{300,600}.webp. A new id on every upload.
   coverId     String?  @db.Uuid
+  /// Genres or moods, e.g. ["Melody", "Kuthu"]. Spelling follows the first album that used it.
+  genres      String[] @default([])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   tracks      Track[]
 
   @@index([artistId])
   @@index([createdAt])
+  @@index([genres], type: Gin)
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Album_title_trgm_idx")
 }
 
@@ -94,7 +97,8 @@ enum TrackStatus {
 
 /// Listeners only ever see READY tracks.
 /// Files: <MEDIA_ROOT>/tmp/<id>.part while uploading, originals/<id>.<originalExt> after,
-/// and hls/<id>/{master.m3u8, 96k/, 160k/, 320k/} once READY.
+/// and hls/<id>/{master.m3u8, 96k/, 160k/, 320k/} once READY, plus lossless.m3u8 and flac/
+/// for lossless originals.
 model Track {
   id               String          @id @default(uuid()) @db.Uuid
   title            String
@@ -115,6 +119,10 @@ model Track {
   sizeBytes        Int?
   /// Codec, sample rate and channels of the original, from ffprobe.
   sourceInfo       String?
+  /// True once hls/<id>/lossless.m3u8 (FLAC) exists; only for lossless originals.
+  lossless         Boolean         @default(false)
+  /// Plain text, or LRC with [mm:ss.xx] timestamps for synced lyrics.
+  lyrics           String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   likes            LikedTrack[]

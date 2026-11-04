@@ -104,6 +104,11 @@ export class UsersService {
     return toPublicUser(user);
   }
 
+  async updateOwnProfile(id: string, displayName: string): Promise<User> {
+    if (!(await this.findById(id))) throw new NotFoundException();
+    return this.prisma.user.update({ where: { id }, data: { displayName: displayName.trim() } });
+  }
+
   /** The user changes their own password. Ends all of their sessions. */
   async changeOwnPassword(id: string, currentPassword: string, newPassword: string): Promise<User> {
     const user = await this.findById(id);

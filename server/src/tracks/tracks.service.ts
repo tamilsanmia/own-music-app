@@ -19,6 +19,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TranscodeQueue } from '../queue/transcode-queue';
 import type { CreateTrackDto, UpdateTrackDto } from './dto';
 import { MAX_CHUNK_BYTES, RECOMMENDED_CHUNK_BYTES } from './limits';
+import { normalizeLyrics } from './lyrics';
 import { presentAdminTrack } from './presenters';
 
 const include = { artist: artistRef } as const;
@@ -186,7 +187,12 @@ export class TracksService {
     }
     const track = await this.prisma.track.update({
       where: { id },
-      data: { title: dto.title, trackNumber: dto.trackNumber, artistId: dto.artistId },
+      data: {
+        title: dto.title,
+        trackNumber: dto.trackNumber,
+        artistId: dto.artistId,
+        lyrics: dto.lyrics === undefined ? undefined : normalizeLyrics(dto.lyrics),
+      },
       include,
     });
     return presentAdminTrack(track);

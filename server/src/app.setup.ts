@@ -29,7 +29,12 @@ export function configureApp(app: INestApplication): void {
     maxAge: '365d',
   });
   app.use(cookieParser());
-  app.enableCors({ origin: config.get('CORS_ORIGIN', { infer: true }), credentials: true });
+  // The site's own origin for the API (with cookies). Stream files are open to any origin, for
+  // Chromecast receivers: the signed token in the path is their only credential.
+  const apiCors = { origin: config.get('CORS_ORIGIN', { infer: true }), credentials: true };
+  app.enableCors((req: { url?: string }, cb: (err: Error | null, options: object) => void) => {
+    cb(null, req.url?.startsWith('/stream/') ? { origin: '*', credentials: false, methods: ['GET', 'HEAD'] } : apiCors);
+  });
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );

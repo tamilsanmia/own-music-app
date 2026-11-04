@@ -30,6 +30,8 @@ export interface Album {
   releaseYear: number | null;
   artist: Ref;
   cover: ImageUrls | null;
+  /** Genres or moods, e.g. ["Melody", "Kuthu"]. */
+  genres: string[];
   createdAt: string;
 }
 export interface AdminAlbum extends Album {
@@ -49,6 +51,10 @@ export interface AdminTrack {
   originalFilename: string | null;
   sizeBytes: number | null;
   sourceInfo: string | null;
+  /** A FLAC stream exists next to the AAC ones (lossless originals only). */
+  lossless: boolean;
+  /** Plain text, or LRC with [mm:ss.xx] time tags. */
+  lyrics: string | null;
   artist: Ref;
   createdAt: string;
   updatedAt: string;
@@ -86,9 +92,9 @@ export const albumsApi = {
   list: (artistId?: string) =>
     api<Page<AdminAlbum>>(`/api/admin/albums?limit=100${artistId ? `&artistId=${id(artistId)}` : ''}`),
   get: (albumId: string) => api<AdminAlbumDetail>(`/api/admin/albums/${id(albumId)}`),
-  create: (input: { title: string; artistId: string; releaseYear?: number }) =>
+  create: (input: { title: string; artistId: string; releaseYear?: number; genres?: string[] }) =>
     api<Album>('/api/admin/albums', { method: 'POST', json: input }),
-  update: (albumId: string, input: { title?: string; artistId?: string; releaseYear?: number | null }) =>
+  update: (albumId: string, input: { title?: string; artistId?: string; releaseYear?: number | null; genres?: string[] }) =>
     api<Album>(`/api/admin/albums/${id(albumId)}`, { method: 'PATCH', json: input }),
   /** With `withTracks`, the album's tracks and their files are deleted too. */
   delete: (albumId: string, withTracks = false) =>
@@ -105,13 +111,27 @@ export const tracksApi = {
     api<{ status: TrackStatus; receivedBytes: number; sizeBytes: number }>(`/api/admin/tracks/${id(trackId)}/upload`),
   complete: (trackId: string) =>
     api<AdminTrack>(`/api/admin/tracks/${id(trackId)}/upload/complete`, { method: 'POST', json: {} }),
-  update: (trackId: string, input: { title?: string; trackNumber?: number }) =>
+  update: (trackId: string, input: { title?: string; trackNumber?: number; lyrics?: string | null }) =>
     api<AdminTrack>(`/api/admin/tracks/${id(trackId)}`, { method: 'PATCH', json: input }),
   retry: (trackId: string) => api<AdminTrack>(`/api/admin/tracks/${id(trackId)}/retry`, { method: 'POST', json: {} }),
   delete: (trackId: string) => api<void>(`/api/admin/tracks/${id(trackId)}`, { method: 'DELETE' }),
 };
 
+export const genresApi = {
+  /** Every genre name in use, for suggestions. */
+  names: () => api<string[]>('/api/admin/genres'),
+};
+
+/** "Melody, Kuthu ,  " -> ["Melody", "Kuthu"]. */
+export function parseGenres(text: string): string[] {
+  return text
+    .split(',')
+    .map((g) => g.trim().replace(/\s+/g, ' '))
+    .filter(Boolean);
+}
+
 export const adminKeys = {
+  genres: ['admin', 'genres'] as const,
   artists: ['admin', 'artists'] as const,
   artist: (artistId: string) => ['admin', 'artists', artistId] as const,
   albums: (artistId?: string) => ['admin', 'albums', artistId ?? 'all'] as const,

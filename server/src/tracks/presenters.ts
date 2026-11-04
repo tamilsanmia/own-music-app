@@ -11,6 +11,8 @@ type AdminTrackRow = {
   originalFilename: string | null;
   sizeBytes: number | null;
   sourceInfo: string | null;
+  lossless: boolean;
+  lyrics: string | null;
   createdAt: Date;
   updatedAt: Date;
   artist: { id: string; name: string };
@@ -29,6 +31,8 @@ export function presentAdminTrack(t: AdminTrackRow) {
     originalFilename: t.originalFilename,
     sizeBytes: t.sizeBytes,
     sourceInfo: t.sourceInfo,
+    lossless: t.lossless,
+    lyrics: t.lyrics,
     artist: t.artist,
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,

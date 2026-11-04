@@ -246,3 +246,52 @@ describe('Deleting albums', () => {
     await waitFor(() => expect(cat.albums).toEqual([]));
   });
 });
+
+describe('Genres, lyrics and lossless', () => {
+  it('saves genres typed with commas and adds existing ones with a click', async () => {
+    const { album } = seedAlbum();
+    const other = seedAlbum().album;
+    other.genres = ['Melody', 'Kuthu'];
+    const { user } = renderApp(`/admin/albums/${album.id}`, { as: 'admin' });
+    const input = await screen.findByLabelText('Genres or moods');
+    await user.type(input, 'Romance,  90s ');
+    const suggestions = await screen.findByRole('group', { name: 'Add an existing genre' });
+    await user.click(within(suggestions).getByRole('button', { name: '+ Melody' }));
+    expect(input).toHaveValue('Romance, 90s, Melody');
+    expect(within(suggestions).queryByRole('button', { name: '+ Melody' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByRole('status');
+    expect(cat.calls.albumUpdates.at(-1)).toMatchObject({ genres: ['Romance', '90s', 'Melody'] });
+  });
+
+  it('edits lyrics, recognises LRC, and clears them', async () => {
+    const { album } = seedAlbum();
+    seedTrack(album.id, 'Feeling Good', 'READY');
+    const { user } = renderApp(`/admin/albums/${album.id}`, { as: 'admin' });
+    await user.click(await screen.findByRole('button', { name: 'Lyrics of Feeling Good' }));
+    const box = screen.getByLabelText('Lyrics text');
+    await user.type(box, 'Birds flying high');
+    expect(screen.getByText(/^Plain lyrics/)).toBeInTheDocument();
+    await user.clear(box);
+    await user.type(box, '[[00:01.00] Birds flying high');
+    expect(screen.getByText(/^Synced lyrics \(LRC\)/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save lyrics' }));
+    await waitFor(() => expect(within(statusOf('Feeling Good')).getByText('Lyrics')).toBeInTheDocument());
+    expect(cat.tracks[0].lyrics).toBe('[00:01.00] Birds flying high');
+
+    await user.click(screen.getByRole('button', { name: 'Lyrics of Feeling Good' }));
+    await user.clear(screen.getByLabelText('Lyrics text'));
+    await user.click(screen.getByRole('button', { name: 'Save lyrics' }));
+    await waitFor(() => expect(within(statusOf('Feeling Good')).queryByText('Lyrics')).not.toBeInTheDocument());
+    expect(cat.tracks[0].lyrics).toBeNull();
+  });
+
+  it('marks tracks that have a lossless stream', async () => {
+    const { album } = seedAlbum();
+    seedTrack(album.id, 'Hi-res', 'READY', { lossless: true });
+    seedTrack(album.id, 'Lossy', 'READY');
+    renderApp(`/admin/albums/${album.id}`, { as: 'admin' });
+    await waitFor(() => expect(within(statusOf('Hi-res')).getByText('Lossless')).toBeInTheDocument());
+    expect(within(statusOf('Lossy')).queryByText('Lossless')).not.toBeInTheDocument();
+  });
+});

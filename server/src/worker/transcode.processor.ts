@@ -5,7 +5,15 @@ import { Worker, type ConnectionOptions, type Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import { access, mkdtemp, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { CommandError, transcodeToHls } from '../audio/ffmpeg';
+import {
+  CommandError,
+  isLosslessCodec,
+  LOSSLESS_DIR,
+  LOSSLESS_PLAYLIST,
+  probe,
+  transcodeLossless,
+  transcodeToHls,
+} from '../audio/ffmpeg';
 import type { Env } from '../config/env';
 import { MediaService } from '../media/media.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,8 +25,8 @@ const RECONCILE_EVERY_MS = 5 * 60_000;
 const RECONCILE_MIN_AGE_MS = 2 * 60_000;
 
 /**
- * Consumes transcode jobs one at a time: original -> HLS (96k/160k/320k) in a temp directory,
- * then an atomic rename into hls/<trackId>/ and status READY. Redis isn't persisted, so on start
+ * Consumes transcode jobs one at a time: original -> HLS (96k/160k/320k, plus FLAC for lossless
+ * originals) in a temp directory, then an atomic rename into hls/<trackId>/ and status READY. Redis isn't persisted, so on start
  * and every few minutes the worker re-queues tracks whose jobs were lost.
  */
 @Injectable()
@@ -86,8 +94,10 @@ export class TranscodeProcessor implements OnApplicationBootstrap, OnApplication
     const started = Date.now();
     const work = await mkdtemp(join(this.media.tmpDir, `hls-${trackId}-`));
     try {
-      await transcodeToHls(this.media.originalPath(trackId, track.originalExt), work);
+      const original = this.media.originalPath(trackId, track.originalExt);
+      await transcodeToHls(original, work);
       await access(join(work, 'master.m3u8'));
+      const lossless = await this.tryLossless(trackId, original, work);
 
       const dest = this.media.hlsDir(trackId);
       await rm(dest, { recursive: true, force: true });
@@ -96,7 +106,7 @@ export class TranscodeProcessor implements OnApplicationBootstrap, OnApplication
       // Only mark READY if the track still exists and nobody changed its state meanwhile.
       const { count } = await this.prisma.track.updateMany({
         where: { id: trackId, status: TrackStatus.PROCESSING },
-        data: { status: TrackStatus.READY, errorMessage: null },
+        data: { status: TrackStatus.READY, errorMessage: null, lossless },
       });
       if (count === 0) {
         await rm(dest, { recursive: true, force: true });
@@ -114,6 +124,24 @@ export class TranscodeProcessor implements OnApplicationBootstrap, OnApplication
         data: { status: final ? TrackStatus.FAILED : TrackStatus.PENDING, errorMessage: message },
       });
       throw err;
+    }
+  }
+
+  /**
+   * For lossless originals (FLAC, WAV, ALAC…), also write a FLAC stream. A failure here only
+   * loses the lossless option; the AAC streams still make the track playable.
+   */
+  private async tryLossless(trackId: string, original: string, work: string): Promise<boolean> {
+    try {
+      const info = await probe(original);
+      if (!isLosslessCodec(info.codec)) return false;
+      await transcodeLossless(original, work, info);
+      return true;
+    } catch (err) {
+      this.logger.warn(`Track ${trackId}: lossless stream failed, AAC only: ${describe(err)}`);
+      await rm(join(work, LOSSLESS_DIR), { recursive: true, force: true });
+      await rm(join(work, LOSSLESS_PLAYLIST), { force: true });
+      return false;
     }
   }
 }

@@ -5,11 +5,13 @@ import {
   NotFoundException,
   Param,
   ParseUUIDPipe,
+  Query,
   Res,
 } from '@nestjs/common';
 import { TrackStatus } from '@prisma/client';
+import { IsIn, IsOptional } from 'class-validator';
 import type { Response } from 'express';
-import { HLS_VARIANTS } from '../audio/ffmpeg';
+import { HLS_VARIANTS, LOSSLESS_DIR, LOSSLESS_PLAYLIST } from '../audio/ffmpeg';
 import { AuthUser, CurrentUser, Public } from '../auth/decorators';
 import { MediaService } from '../media/media.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -22,8 +24,16 @@ import { StreamTokenService } from './stream-token.service';
  */
 const variantNames = HLS_VARIANTS.map((v) => v.name).join('|');
 const ALLOWED_PATH = new RegExp(
-  `^(?:master\\.m3u8|(?:${variantNames})/(?:index\\.m3u8|init_\\d{1,2}\\.mp4|seg_\\d{3,6}\\.m4s))$`,
+  `^(?:master\\.m3u8|(?:${variantNames})/(?:index\\.m3u8|init_\\d{1,2}\\.mp4|seg_\\d{3,6}\\.m4s)` +
+    `|${LOSSLESS_PLAYLIST.replace('.', '\\.')}|${LOSSLESS_DIR}/(?:index\\.m3u8|init\\.mp4|seg_\\d{3,6}\\.m4s))$`,
 );
+
+class StreamUrlQuery {
+  /** "lossless" asks for the FLAC stream; tracks without one get the normal AAC stream. */
+  @IsOptional()
+  @IsIn(['auto', 'lossless'])
+  quality?: 'auto' | 'lossless';
+}
 
 function contentType(path: string): string {
   return path.endsWith('.m3u8') ? 'application/vnd.apple.mpegurl' : 'audio/mp4';
@@ -38,11 +48,20 @@ export class StreamUrlController {
   ) {}
 
   @Get(':id/stream-url')
-  async streamUrl(@CurrentUser() user: AuthUser, @Param('id', new ParseUUIDPipe()) id: string) {
-    const track = await this.prisma.track.findFirst({ where: { id, status: TrackStatus.READY }, select: { id: true } });
+  async streamUrl(
+    @CurrentUser() user: AuthUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Query() query: StreamUrlQuery,
+  ) {
+    const track = await this.prisma.track.findFirst({
+      where: { id, status: TrackStatus.READY },
+      select: { id: true, lossless: true },
+    });
     if (!track) throw new NotFoundException('Track not found');
     const { token, expiresAt } = this.tokens.sign(user.id, track.id);
-    return { url: `/stream/${token}/${track.id}/master.m3u8`, expiresAt };
+    const lossless = query.quality === 'lossless' && track.lossless;
+    const playlist = lossless ? LOSSLESS_PLAYLIST : 'master.m3u8';
+    return { url: `/stream/${token}/${track.id}/${playlist}`, expiresAt, lossless };
   }
 }
 
@@ -85,6 +104,8 @@ export class StreamController {
           'Content-Type': contentType(path),
           // Per-user URL: browsers may cache it until the token expires; shared caches may not.
           'Cache-Control': `private, max-age=${remaining}`,
+          // Chromecast receivers load these from their own origin (CORS is set in app.setup.ts).
+          'Cross-Origin-Resource-Policy': 'cross-origin',
         },
       },
       (err?: Error & { status?: number; statusCode?: number }) => {

@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TranscodeQueue } from '../queue/transcode-queue';
 import { presentAdminTrack } from '../tracks/presenters';
 import type { AdminAlbumsQuery, CreateAlbumDto, UpdateAlbumDto } from './dto';
+import { GenresService } from './genres.service';
 import { albumIsVisible, artistRef, presentAlbum, presentTrack, READY } from './presenters';
 
 /** How many albums the Home screen shows. */
@@ -15,6 +16,7 @@ export class AlbumsService {
     private readonly prisma: PrismaService,
     private readonly media: MediaService,
     private readonly queue: TranscodeQueue,
+    private readonly genres: GenresService,
   ) {}
 
   // ---- listener reads ----
@@ -74,7 +76,12 @@ export class AlbumsService {
   async create(dto: CreateAlbumDto) {
     await this.artistMustExist(dto.artistId);
     const album = await this.prisma.album.create({
-      data: { title: dto.title, artistId: dto.artistId, releaseYear: dto.releaseYear ?? null },
+      data: {
+        title: dto.title,
+        artistId: dto.artistId,
+        releaseYear: dto.releaseYear ?? null,
+        genres: await this.genres.canonical(dto.genres ?? []),
+      },
       include: { artist: artistRef },
     });
     return presentAlbum(album);
@@ -85,7 +92,12 @@ export class AlbumsService {
     if (dto.artistId) await this.artistMustExist(dto.artistId);
     const album = await this.prisma.album.update({
       where: { id },
-      data: { title: dto.title, artistId: dto.artistId, releaseYear: dto.releaseYear },
+      data: {
+        title: dto.title,
+        artistId: dto.artistId,
+        releaseYear: dto.releaseYear,
+        genres: dto.genres ? await this.genres.canonical(dto.genres) : undefined,
+      },
       include: { artist: artistRef },
     });
     return presentAlbum(album);

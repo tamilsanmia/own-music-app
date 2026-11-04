@@ -16,6 +16,7 @@ export const cat = {
     streamUrl: [] as string[],
     search: [] as string[],
     plays: [] as string[],
+    albumUpdates: [] as object[],
   },
   /** userId -> liked track ids, newest first. */
   likes: new Map<string, string[]>(),
@@ -39,7 +40,7 @@ export function resetCatalog(): void {
   cat.albums = [];
   cat.tracks = [];
   cat.chunkBytes = 4;
-  cat.calls = { chunks: [], getAlbum: 0, retry: [], deleted: [], streamUrl: [], search: [], plays: [] };
+  cat.calls = { chunks: [], getAlbum: 0, retry: [], deleted: [], streamUrl: [], search: [], plays: [], albumUpdates: [] };
   cat.likes = new Map();
   cat.history = new Map();
   cat.failLikes = false;
@@ -51,7 +52,15 @@ export function resetCatalog(): void {
 
 export function seedAlbum() {
   const artist: Artist = { id: `ar-${++seq}`, name: 'Nina Simone', bio: null, image: null };
-  const album = { id: `al-${++seq}`, title: 'Pastel Blues', releaseYear: 1965, artistId: artist.id, cover: null, createdAt: now };
+  const album = {
+    id: `al-${++seq}`,
+    title: 'Pastel Blues',
+    releaseYear: 1965 as number | null,
+    artistId: artist.id,
+    cover: null,
+    genres: [] as string[],
+    createdAt: now,
+  };
   cat.artists.push(artist);
   cat.albums.push(album);
   return { artist, album };
@@ -76,6 +85,8 @@ export function seedTrack(
     originalFilename: `${title}.mp3`,
     sizeBytes: 10,
     sourceInfo: 'mp3 · 44.1 kHz · stereo',
+    lossless: false,
+    lyrics: null as string | null,
     artist: { id: artist.id, name: artist.name },
     createdAt: now,
     updatedAt: now,
@@ -328,6 +339,19 @@ export const catalogHandlers = [
       .sort((x, y) => x.trackNumber - y.trackNumber)
       .map(publicTrack);
     return HttpResponse.json({ ...presentAlbum(a), tracks });
+  }),
+  http.patch('*/api/admin/albums/:id', async ({ request, params }) => {
+    if (!isAdmin(request)) return deny();
+    const a = cat.albums.find((x) => x.id === params.id);
+    if (!a) return notFound();
+    const body = (await request.json()) as { title?: string; artistId?: string; releaseYear?: number | null; genres?: string[] };
+    cat.calls.albumUpdates.push(body);
+    Object.assign(a, body);
+    return HttpResponse.json(presentAlbum(a));
+  }),
+  http.get('*/api/admin/genres', ({ request }) => {
+    if (!isAdmin(request)) return deny();
+    return HttpResponse.json([...new Set(cat.albums.flatMap((a) => a.genres))].sort());
   }),
 
   http.post('*/api/admin/tracks', async ({ request }) => {

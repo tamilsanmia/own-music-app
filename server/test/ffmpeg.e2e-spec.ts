@@ -17,7 +17,7 @@ describe('ffmpeg integration', () => {
     const info = await probe(fx.wav);
     expect(info.durationMs).toBeGreaterThanOrEqual(4990);
     expect(info.durationMs).toBeLessThanOrEqual(5010);
-    expect(info.summary).toBe('pcm_s16le · 44.1 kHz · stereo');
+    expect(info.summary).toBe('pcm_s16le · 44.1 kHz · 16-bit · stereo');
   });
 
   it('rejects a file without audio', async () => {

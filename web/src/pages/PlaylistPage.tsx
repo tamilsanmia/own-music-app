@@ -24,7 +24,7 @@ import { Field, FormError, Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { ApiError } from '@/lib/api';
 import { formatDuration } from '@/lib/format';
-import { playlistKeys, playlistsApi, usePlaylist, usePlaylistActions, type Playlist } from '@/lib/playlists';
+import { playlistKeys, playlistsApi, usePlaylist, usePlaylistActions, type Playlist, type PlaylistSummary } from '@/lib/playlists';
 import { useQueryClient } from '@tanstack/react-query';
 import { currentTrack, usePlayer, type QueueTrack } from '@/player/store';
 
@@ -183,6 +183,7 @@ export function PlaylistPage() {
           description="The songs stay in the library; only this playlist is removed."
           onConfirm={async () => {
             await playlistsApi.delete(p.id);
+            queryClient.setQueryData<PlaylistSummary[]>(playlistKeys.list, (list) => list?.filter((x) => x.id !== p.id));
             queryClient.removeQueries({ queryKey: playlistKeys.one(p.id) });
             navigate('/', { replace: true });
             await queryClient.invalidateQueries({ queryKey: playlistKeys.list });

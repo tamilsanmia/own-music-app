@@ -82,7 +82,7 @@ try {
   await page.getByRole('button', { name: 'Delete playlist' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
   await page.waitForURL(`${BASE}/`);
-  if (await page.getByRole('navigation', { name: 'Your playlists' }).getByText(name).count()) throw new Error('still in sidebar');
+  await page.getByRole('navigation', { name: 'Your playlists' }).getByText(name, { exact: true }).waitFor({ state: 'detached', timeout: 5000 });
 
   if (errors.length) throw new Error(`browser console errors:\n${errors.join('\n')}`);
   console.log('OK');

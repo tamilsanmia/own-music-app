@@ -27,11 +27,15 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 docker volume create music-android-gradle >/dev/null
 docker volume create music-android-m2 >/dev/null
+docker volume create music-android-home >/dev/null
 # ~/.m2 holds Robolectric's android-all jar; keeping it avoids re-downloading (and Maven Central 429s).
+# ~/.android holds debug.keystore; without it every build gets a new debug key and Android
+# refuses to install the APK over the previous one.
 docker run --rm \
   -v "$DIR":/project -w /project \
   -v music-android-gradle:/root/.gradle \
   -v music-android-m2:/root/.m2 \
+  -v music-android-home:/root/.android \
   -e GRADLE_OPTS="-Dorg.gradle.daemon=false" \
   "$IMAGE" ./gradlew --no-daemon --console=plain "$@"
 REMOTE

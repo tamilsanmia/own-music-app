@@ -25,7 +25,7 @@ fun Throwable.userMessage(): String {
         this is HttpException && code() == 429 -> "Too many attempts. Wait a minute and try again."
         this is HttpException -> serverMessage(this) ?: "Something went wrong (${code()})."
         this is SerializationException -> "The server sent an answer the app doesn’t understand."
-        else -> "Something went wrong (${this::class.simpleName})."
+        else -> "Something went wrong (${this::class.simpleName}${message?.let { ": " + it.take(120) } ?: ""})."
     }
 }
 

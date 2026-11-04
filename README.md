@@ -209,3 +209,16 @@ playback check (`scripts/browser-demo.sh player`) runs Google Chrome.
 
 `deploy/demo-discover.sh` runs searches, likes and unlikes two songs, and records a play as
 the admin.
+
+### Playlists
+
+Each listener has private playlists (others get 404). `GET/POST /api/me/playlists`,
+`GET/PATCH/DELETE /api/me/playlists/:id`, `POST /api/me/playlists/:id/tracks { trackIds }`
+(appends, skipping unplayable tracks), `DELETE /api/me/playlists/:id/tracks/:itemId` and
+`POST /api/me/playlists/:id/move { itemId, toIndex }`. Entries have their own `itemId`, so a
+song can be in a playlist twice. Limits: 500 playlists per user, 5,000 songs per playlist.
+
+In the web app: **+** next to Playlists in the sidebar creates one. "⋯ → Add to playlist" on
+any song adds it to a playlist (or a new one). On the playlist page, drag songs by the handle
+(mouse or keyboard), or use "⋯ → Move up / Move down / Remove from this playlist".
+`scripts/browser-demo.sh playlist` checks create, add, drag-reorder and delete in a real browser.

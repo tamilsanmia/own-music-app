@@ -1,4 +1,5 @@
 import java.time.Duration
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -8,6 +9,22 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
+
+/**
+ * Release signing. Put these in android/keystore.properties (gitignored), or pass them as
+ * -P Gradle properties:
+ *   music.keystore.path=/path/to/music-release.jks
+ *   music.keystore.password=...
+ *   music.key.alias=music
+ *   music.key.password=...
+ * Without them, release builds are produced unsigned.
+ */
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun signing(name: String): String? = (findProperty(name) as String?) ?: keystoreProps.getProperty(name)
+val hasReleaseKey = signing("music.keystore.path") != null
 
 android {
     // Kotlin code lives in package "snowsig.music": "in" is a Kotlin keyword, so the reverse
@@ -26,8 +43,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = file(signing("music.keystore.path")!!)
+                storePassword = signing("music.keystore.password")
+                keyAlias = signing("music.key.alias")
+                keyPassword = signing("music.key.password")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (hasReleaseKey) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

@@ -14,7 +14,7 @@ IMAGE=music-android-build:36
 [ $# -gt 0 ] || { echo "usage: $0 <gradle tasks...>" >&2; exit 1; }
 
 ssh "$HOST" "mkdir -p $REMOTE"
-rsync -az --delete --exclude .gradle --exclude build --exclude local.properties --exclude '*.jks' \
+rsync -az --delete --exclude .gradle --exclude build --exclude local.properties --exclude keystore.properties --exclude '*.jks' \
   "$REPO_ROOT/android/" "$HOST:$REMOTE/"
 
 status=0

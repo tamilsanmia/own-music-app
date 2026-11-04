@@ -1,13 +1,25 @@
 # Own Music App
 
-A private, invite-only, Spotify-style music service.
+A private, invite-only, Spotify-style music service: the admin uploads music, invited
+listeners stream it on the web and on Android (with offline downloads).
 
 - `server/` — NestJS API and HLS transcoding worker (Prisma + PostgreSQL, BullMQ + Redis)
 - `web/` — React web player and admin panel (Vite, Tailwind, TanStack Query)
-- `android/` — Kotlin / Jetpack Compose Android app (coming in Task 12)
-- `deploy/` — microk8s manifests and deploy scripts
+- `android/` — Kotlin / Jetpack Compose Android app (Media3, Hilt, Retrofit, Room)
+- `deploy/` — microk8s manifests, deploy, backup and demo scripts
 
 Production URL: https://music.snowsig.in
+
+**Everyday tasks**
+
+| What | How |
+| --- | --- |
+| Add music | Web app → Admin → Artists → New artist → New album → drop audio files |
+| Invite a listener | Web app → Admin → Users → Add listener |
+| Deploy a change | `deploy/deploy.sh`, then `deploy/smoke.sh` |
+| Back up / check a backup | `ssh Dev /opt/music-app/deploy/backup.sh`, `ssh Dev /opt/music-app/deploy/restore-test.sh` |
+| Build the Android app | Android Studio → open `android/` → Run (or `scripts/android.sh assembleDebug`) |
+| Signed release APK | See [Release APK](#release-apk) |
 
 ## Local development
 
@@ -73,7 +85,8 @@ scripts/browser-demo.sh --cleanup player       # real playback in Google Chrome 
 `browser-demo.sh` runs Chromium in the Playwright image on the Dev server, saves screenshots to
 `.data/browser-demo/`, and with `--cleanup` removes the image again. The auth demos leave a
 deactivated `*-demo-*@music.snowsig.in` listener behind (there is no delete endpoint yet); the
-catalog demo leaves "Browser Demo Artist / Browser Demo Album" with 3 short test tracks.
+catalog demo creates "Browser Demo Artist / Browser Demo Album" with 3 short test tracks
+(delete it afterwards from Admin → Albums).
 
 ## Admin pages
 
@@ -88,8 +101,9 @@ Retry button. Tracks can be renamed, renumbered, moved up or down, and deleted.
 login, then deletes both and checks the files are gone (`--keep` leaves them for a look).
 
 The admin account (`ADMIN_EMAIL` / `ADMIN_PASSWORD` in `deploy/.env`) is created on the first
-start. Changing those values later does not change the existing account; use
-`PATCH /api/me/password` (or the web app, from Task 4) instead.
+start. Changing those values later does not change the existing account; change the password
+on the web app's Account page instead (and update `ADMIN_PASSWORD` in `deploy/.env` if you
+want the demo scripts to keep working).
 
 `deploy.sh` tags images with the git short SHA (plus `-dirty-<time>` for uncommitted changes),
 recreates the `music-secrets` Secret from `deploy/.env`, and runs Prisma migrations in the api
@@ -249,3 +263,105 @@ Android Keystore. The access token lives only in memory. An OkHttp authenticator
 401, one refresh at a time; login and refresh use their own OkHttp dispatcher so waiting requests
 can't block them. If the server can't be reached at startup, the app stays signed in with the
 cached profile.
+
+### What the Android app does
+
+- **Screens:** Login, Home (recently played, new albums), Search, Your Library (Liked Songs,
+  Downloads, playlists, recently played), album, artist and playlist pages, and a full Now
+  Playing screen.
+- **Playback** (`playback/PlaybackService.kt`, a Media3 `MediaSessionService` with ExoPlayer):
+  - Playback continues in the background with notification, lock-screen, Bluetooth and headset
+    controls, and keeps going when the app is swiped away.
+  - It pauses for calls and other apps (audio focus) and when headphones are unplugged.
+  - Each queue item is `music://track/<id>`. A `ResolvingDataSource` swaps in a fresh signed
+    URL when ExoPlayer loads it, and refreshes it once on a 401/403.
+- **Likes and playlists:** hearts everywhere; "⋯ → Add to playlist / Download / Go to album /
+  Go to artist"; playlist Move up/down, Remove, Rename and Delete. Changes show at once and are
+  undone if the server refuses.
+- **Offline** (`offline/`):
+  - The download button on an album, playlist or Liked Songs (or "⋯ → Download") saves songs
+    to the phone at 160 kbps, about 1.2 MB a minute.
+  - Downloaded songs always play from the phone. When offline, a banner appears, other songs
+    are greyed out, and only downloaded songs are queued.
+  - Plays are stored in Room and sent by WorkManager once there's a connection, with the
+    time they really happened.
+  - Media3 caches by URL, so cache keys drop the stream token
+    (`TokenStrippingCacheKeyFactory`); otherwise downloads would be lost when their URL expired.
+
+**Check on a phone** (the server can't run an emulator):
+
+1. Log in, play an album, lock the phone, and skip from the lock screen. Swipe the app away;
+   the music keeps playing.
+2. Download an album. Watch the download notification, and see the green markers when done.
+3. Turn on airplane mode, open Library → Downloads and play. Other songs are greyed out.
+4. Listen for 30 s, turn the network back on, and the play shows up under Recently played on
+   the web.
+
+## Release APK
+
+1. Create a release key once and keep it safe. Without it you can't update the installed app:
+
+   ```bash
+   keytool -genkeypair -keystore music-release.jks -alias music -keyalg RSA -keysize 3072 -validity 10000
+   ```
+
+   (or in Android Studio: Build → Generate Signed App Bundle / APK → Create new).
+2. Create `android/keystore.properties`. It is gitignored; never commit it or the `.jks` file:
+
+   ```properties
+   music.keystore.path=C:/Users/tamil/keys/music-release.jks
+   music.keystore.password=...
+   music.key.alias=music
+   music.key.password=...
+   ```
+
+3. Build: Android Studio → Build → Build APK(s) with the `release` variant, or
+   `gradlew assembleRelease` in `android/`. The APK is at
+   `android/app/build/outputs/apk/release/app-release.apk` (about 3 MB; R8 shrinks it).
+4. Install it on your phone. Copy the file over and allow "install unknown apps", or use
+   `adb install app-release.apk`.
+
+Raise `versionCode` (and `versionName`) in `android/app/build.gradle.kts` for each new release,
+so phones accept it as an update.
+
+## Backups
+
+`deploy/backup.sh` runs on the Dev server. It writes `/srv/music-backups/<UTC time>/` with
+`db.dump` (pg_dump), `media/` (all music files) and `manifest.txt` (row counts). Unchanged files
+are hard links to the previous backup, so a daily backup only uses space for new music. The
+last 7 are kept.
+
+```bash
+ssh Dev /opt/music-app/deploy/backup.sh          # back up now
+ssh Dev /opt/music-app/deploy/restore-test.sh    # restore the newest into a scratch DB and compare
+```
+
+To back up every night at 03:30, add this line with `ssh Dev crontab -e`:
+
+```
+30 3 * * * /opt/music-app/deploy/backup.sh >> /var/log/music-backup.log 2>&1
+```
+
+These backups sit on the same disk as the music. Copy `/srv/music-backups` to another machine
+now and then, for example with `rsync -a Dev:/srv/music-backups/ /backup/music/`.
+
+**Restoring for real** (this replaces the live data):
+
+```bash
+ssh Dev
+B=/srv/music-backups/<time>
+microk8s kubectl -n music scale deploy/api deploy/worker --replicas=0
+microk8s kubectl -n music exec -i postgres-0 -- pg_restore -U music -d music --clean --if-exists --no-owner < $B/db.dump
+rsync -a --delete $B/media/ /srv/music/ && chown -R 1000:1000 /srv/music
+microk8s kubectl -n music scale deploy/api deploy/worker --replicas=1
+```
+
+## Tests
+
+| Part | Command | Count |
+| --- | --- | --- |
+| Server unit | `scripts/node.sh server npm test` | 22 |
+| Server e2e (Postgres, Redis, ffmpeg) | `scripts/node.sh server npm run test:e2e` | 95 |
+| Web (Vitest, Testing Library, MSW) | `scripts/node.sh web npm test` | 80 |
+| Android unit (JUnit, MockK, Turbine, Robolectric) | `scripts/android.sh testDebugUnitTest` | 48 |
+| Production checks | `deploy/smoke.sh`, `deploy/demo-*.sh`, `scripts/browser-demo.sh <auth\|catalog\|player\|playlist>` | |

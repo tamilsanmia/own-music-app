@@ -16,5 +16,5 @@ RUN apt-get update \
   && mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest \
   && rm /tmp/tools.zip \
   && yes | sdkmanager --licenses >/dev/null \
-  && sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" >/dev/null \
+  && sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" "build-tools;35.0.0" >/dev/null \
   && chmod -R a+rX $ANDROID_HOME

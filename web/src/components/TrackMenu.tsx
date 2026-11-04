@@ -2,6 +2,7 @@ import { Disc3, ListPlus, MoreHorizontal, User } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import type { QueueTrack } from '@/player/store';
 import { AddToPlaylistDialog } from './AddToPlaylistDialog';
@@ -10,7 +11,6 @@ import { AddToPlaylistDialog } from './AddToPlaylistDialog';
 export function TrackMenu({ track, extra, className }: { track: QueueTrack; extra?: ReactNode; className?: string }) {
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   return (
     <>
@@ -43,16 +43,8 @@ export function TrackMenu({ track, extra, className }: { track: QueueTrack; extr
           trackIds={[track.id]}
           label={track.title}
           onClose={() => setAdding(false)}
-          onAdded={(name) => {
-            setNotice(`Added to ${name}`);
-            setTimeout(() => setNotice(null), 3000);
-          }}
+          onAdded={(name) => toast(`Added to ${name}`)}
         />
-      )}
-      {notice && (
-        <p role="status" className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-md bg-foreground px-4 py-2 text-sm font-semibold text-background shadow-lg">
-          {notice}
-        </p>
       )}
     </>
   );

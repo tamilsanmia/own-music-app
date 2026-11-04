@@ -5,6 +5,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { Spinner } from '@/components/ui/spinner';
 import { PlayerBar, usePlaybackEngine } from '@/player/PlayerBar';
 import { SidebarPlaylists } from './SidebarPlaylists';
+import { Toaster } from './Toaster';
 import { cn } from '@/lib/utils';
 
 function NavItem({ to, icon: Icon, label, end }: { to: string; icon: ComponentType<{ className?: string }>; label: string; end?: boolean }) {
@@ -87,6 +88,7 @@ export function AppLayout() {
       </main>
       </div>
       <PlayerBar />
+      <Toaster />
     </div>
   );
 }

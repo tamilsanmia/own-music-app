@@ -5,6 +5,7 @@
 # Usage: scripts/browser-demo.sh [--cleanup] [auth|catalog]
 #   auth     login, users, roles (scripts/browser-demo-auth.mjs) - default
 #   catalog  artist, album, cover and track uploads (scripts/browser-demo-catalog.mjs)
+#   playlist create, add, drag-reorder and delete a playlist
 #   player   real playback in Google Chrome, which has the AAC decoder Playwright's Chromium lacks
 #   --cleanup  remove the Playwright image from the server afterwards
 set -euo pipefail
@@ -38,7 +39,8 @@ ssh "$HOST" 'rm -rf /tmp/music-browser-demo-assets && mkdir -p /tmp/music-browse
 if [ -n "$(ls -A "$ASSETS")" ]; then scp -q "$ASSETS"/* "$HOST:/tmp/music-browser-demo-assets/"; fi
 
 # ssh joins arguments into one string, so an empty one would vanish: pass "keep" instead.
-ssh "$HOST" bash -s -- "$IMAGE" "$PW_VERSION" "${CLEANUP:-keep}" "$CHANNEL" <<'REMOTE'
+status=0
+ssh "$HOST" bash -s -- "$IMAGE" "$PW_VERSION" "${CLEANUP:-keep}" "$CHANNEL" <<'REMOTE' || status=$?
 set -uo pipefail
 IMAGE="$1"; PW_VERSION="$2"; CLEANUP="$3"; CHANNEL="$4"
 OUT=/tmp/music-browser-demo; rm -rf "$OUT"; mkdir -p "$OUT"; chmod 777 "$OUT"
@@ -55,3 +57,4 @@ mkdir -p "$REPO_ROOT/.data/browser-demo"
 scp -q "$HOST:/tmp/music-browser-demo/*.png" "$REPO_ROOT/.data/browser-demo/" 2>/dev/null || true
 ssh "$HOST" rm -rf /tmp/music-browser-demo
 echo "Screenshots: .data/browser-demo/"
+exit $status

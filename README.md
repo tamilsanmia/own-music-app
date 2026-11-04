@@ -222,3 +222,30 @@ In the web app: **+** next to Playlists in the sidebar creates one. "⋯ → Add
 any song adds it to a playlist (or a new one). On the playlist page, drag songs by the handle
 (mouse or keyboard), or use "⋯ → Move up / Move down / Remove from this playlist".
 `scripts/browser-demo.sh playlist` checks create, add, drag-reorder and delete in a real browser.
+
+## Android app
+
+`android/` is a Kotlin + Jetpack Compose app: application id `in.snowsig.music`, minSdk 26,
+targetSdk 36. The Kotlin package is `snowsig.music`, because `in` is a Kotlin keyword. It talks
+to `https://music.snowsig.in` (`BASE_URL` in `app/build.gradle.kts`).
+
+**On your PC:** clone the repo, open the `android/` folder in Android Studio, let Gradle sync,
+and press Run. Android Studio installs the SDK pieces it needs.
+
+**On the Dev server (no Android Studio needed):** `scripts/android.sh` copies `android/` to the
+server and runs Gradle in a container with the Android SDK (`android/ci/Dockerfile`). Reports
+and APKs are copied back to `android/app/build/`.
+
+```bash
+scripts/android.sh testDebugUnitTest assembleDebug
+# APK: android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+The server has no KVM, so emulator tests (`connectedAndroidTest`) must run from Android Studio
+on your PC.
+
+Login: the refresh token is stored in DataStore, encrypted with an AES-GCM key held in the
+Android Keystore. The access token lives only in memory. An OkHttp authenticator refreshes on
+401, one refresh at a time; login and refresh use their own OkHttp dispatcher so waiting requests
+can't block them. If the server can't be reached at startup, the app stays signed in with the
+cached profile.

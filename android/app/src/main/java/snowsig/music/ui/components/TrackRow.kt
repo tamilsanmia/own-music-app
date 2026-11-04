@@ -13,6 +13,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Equalizer
@@ -142,7 +144,7 @@ fun TrackRow(
 }
 
 @Composable
-fun TrackMenu(track: QueueTrack, extra: List<TrackMenuItem> = emptyList()) {
+fun TrackMenu(track: QueueTrack, extra: List<TrackMenuItem> = emptyList(), actions: TrackActionsViewModel = hiltViewModel()) {
     val nav = LocalNavigator.current
     var open by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
@@ -155,6 +157,16 @@ fun TrackMenu(track: QueueTrack, extra: List<TrackMenuItem> = emptyList()) {
                 text = { Text("Add to playlist") },
                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) },
                 onClick = { open = false; adding = true },
+            )
+            DropdownMenuItem(
+                text = { Text("Play next") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null) },
+                onClick = { open = false; actions.playNext(track) },
+            )
+            DropdownMenuItem(
+                text = { Text("Start radio") },
+                leadingIcon = { Icon(Icons.Filled.Radio, null) },
+                onClick = { open = false; actions.startRadio(track) },
             )
             extra.forEach { item ->
                 DropdownMenuItem(text = { Text(item.label) }, enabled = item.enabled, onClick = { open = false; item.onClick() })

@@ -45,6 +45,21 @@ class OfflineTest {
         assertEquals(false, key("https://h/stream/t/abc/160k/seg_001.m4s") == key("https://h/stream/t/xyz/160k/seg_001.m4s"))
         assertEquals("https://music.snowsig.in/media/covers/x-300.webp", key("https://music.snowsig.in/media/covers/x-300.webp"))
         assertEquals("custom", TokenStrippingCacheKeyFactory.buildCacheKey(DataSpec.Builder().setUri("music://track/abc").setKey("custom").build()))
+        // The lossless playlist must not be confused with the downloaded AAC master.
+        assertEquals("track:abc:lossless", key("music://track/abc?q=lossless"))
+        assertEquals("stream/abc/flac/seg_001.m4s", key("https://music.snowsig.in/stream/t/abc/flac/seg_001.m4s"))
+    }
+
+    @Test
+    fun `downloads keep the rendition picked in settings`() {
+        val t = QueueTrack("t1", "Nilavai", 367_000, Ref("ar", "Deva"), AlbumRef("al", "Vaali"), lossless = true)
+        for ((variant, quality) in listOf(0 to "96k", 1 to "160k", 2 to "320k")) {
+            val r = downloadRequestFor(t, variant)
+            assertEquals(quality, listOf(StreamKey(HlsMultivariantPlaylist.GROUP_INDEX_VARIANT, variant)), r.streamKeys)
+            // Downloads are always the AAC master, never the FLAC stream.
+            assertEquals(trackUri("t1"), r.uri)
+        }
+        assertEquals(t, downloadRequestFor(t).trackInfo()!!.toQueueTrack())
     }
 
     private val track = QueueTrack("t1", "Nilavai", 367_000, Ref("ar", "Deva"), AlbumRef("al", "Vaali", ImageUrls("/s.webp", "/l.webp")))

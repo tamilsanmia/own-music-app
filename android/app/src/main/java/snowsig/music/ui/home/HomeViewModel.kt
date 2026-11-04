@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import snowsig.music.data.api.AlbumDto
+import snowsig.music.data.api.GenreDto
 import snowsig.music.data.api.MusicApi
 import snowsig.music.data.api.TrackDto
 import snowsig.music.data.api.userMessage
@@ -20,6 +21,9 @@ data class HomeUiState(
     val refreshing: Boolean = false,
     val newAlbums: List<AlbumDto> = emptyList(),
     val recent: List<TrackDto> = emptyList(),
+    val mostPlayed: List<TrackDto> = emptyList(),
+    val topThisWeek: List<TrackDto> = emptyList(),
+    val genres: List<GenreDto> = emptyList(),
     val error: String? = null,
 )
 
@@ -40,8 +44,16 @@ class HomeViewModel @Inject constructor(private val api: MusicApi) : ViewModel()
             try {
                 val home = async { api.home() }
                 val recent = async { runCatching { api.recent().items }.getOrDefault(emptyList()) }
+                val h = home.await()
                 _state.update {
-                    HomeUiState(loading = false, newAlbums = home.await().newAlbums, recent = recent.await().take(8))
+                    HomeUiState(
+                        loading = false,
+                        newAlbums = h.newAlbums,
+                        recent = recent.await().take(8),
+                        mostPlayed = h.mostPlayed,
+                        topThisWeek = h.topThisWeek,
+                        genres = h.genres,
+                    )
                 }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, refreshing = false, error = e.userMessage()) }

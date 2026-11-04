@@ -207,6 +207,8 @@ describe('Catalog', () => {
         }).expect(200); // no Authorization header
         expect(file.headers['content-type']).toBe('image/webp');
         expect(file.headers['cache-control']).toMatch(/max-age=31536000.*immutable/);
+        // Chromecast receivers load covers from another origin.
+        expect(file.headers['cross-origin-resource-policy']).toBe('cross-origin');
         const meta = await sharp(file.body as Buffer).metadata();
         expect([meta.format, meta.width, meta.height]).toEqual(['webp', size, size]);
       }

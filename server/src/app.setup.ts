@@ -27,6 +27,8 @@ export function configureApp(app: INestApplication): void {
     redirect: false,
     immutable: true,
     maxAge: '365d',
+    // Chromecast receivers show covers from their own origin; helmet's default is same-site.
+    setHeaders: (res) => res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'),
   });
   app.use(cookieParser());
   // The site's own origin for the API (with cookies). Stream files are open to any origin, for

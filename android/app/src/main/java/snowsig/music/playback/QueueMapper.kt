@@ -18,15 +18,18 @@ data class QueueTrack(
     val durationMs: Long?,
     val artist: Ref,
     val album: AlbumRef,
+    /** The server has a FLAC stream of this track. */
+    val lossless: Boolean = false,
 )
 
 fun TrackDto.toQueueTrack(albumContext: AlbumRef? = null): QueueTrack =
-    QueueTrack(id, title, durationMs, artist, album ?: albumContext ?: AlbumRef("", ""))
+    QueueTrack(id, title, durationMs, artist, album ?: albumContext ?: AlbumRef("", ""), lossless)
 
 private const val ARTIST_ID = "artistId"
 private const val ALBUM_ID = "albumId"
 private const val COVER_SMALL = "coverSmall"
 private const val COVER_LARGE = "coverLarge"
+private const val HAS_LOSSLESS = "lossless"
 
 /** A playable item. The URI is resolved to a signed URL at load time (see StreamResolver). */
 fun QueueTrack.toMediaItem(): MediaItem = MediaItem.Builder()
@@ -49,6 +52,7 @@ private fun QueueTrack.metadata(): MediaMetadata = MediaMetadata.Builder()
         Bundle().apply {
             putString(ARTIST_ID, artist.id)
             putString(ALBUM_ID, album.id)
+            putBoolean(HAS_LOSSLESS, lossless)
             album.cover?.let {
                 putString(COVER_SMALL, it.small)
                 putString(COVER_LARGE, it.large)
@@ -59,10 +63,12 @@ private fun QueueTrack.metadata(): MediaMetadata = MediaMetadata.Builder()
 
 /**
  * Controllers don't pass an item's URI to the session (only id and metadata), so the service
- * rebuilds playable items here.
+ * rebuilds playable items here. With [preferLossless], tracks that have a FLAC stream use it.
  */
-fun MediaItem.withPlayableUri(): MediaItem =
-    buildUpon().setUri(trackUri(mediaId)).setMimeType(MimeTypes.APPLICATION_M3U8).build()
+fun MediaItem.withPlayableUri(preferLossless: Boolean = false): MediaItem {
+    val lossless = preferLossless && mediaMetadata.extras?.getBoolean(HAS_LOSSLESS) == true
+    return buildUpon().setUri(trackUri(mediaId, lossless)).setMimeType(MimeTypes.APPLICATION_M3U8).build()
+}
 
 fun MediaItem.toQueueTrack(): QueueTrack {
     val m = mediaMetadata
@@ -79,5 +85,6 @@ fun MediaItem.toQueueTrack(): QueueTrack {
             title = m.albumTitle?.toString().orEmpty(),
             cover = if (small != null && large != null) ImageUrls(small, large) else null,
         ),
+        lossless = extras?.getBoolean(HAS_LOSSLESS) == true,
     )
 }

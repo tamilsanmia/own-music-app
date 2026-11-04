@@ -37,8 +37,8 @@ android {
         applicationId = "in.snowsig.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.1.2"
+        versionCode = 4
+        versionName = "0.2.0"
         buildConfigField("String", "BASE_URL", "\"https://music.snowsig.in\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -125,6 +125,8 @@ dependencies {
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.session)
     implementation(libs.media3.datasource.okhttp)
+    implementation(libs.media3.cast)
+    implementation(libs.kotlinx.coroutines.guava)
 
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)

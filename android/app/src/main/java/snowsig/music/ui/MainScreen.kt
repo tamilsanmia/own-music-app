@@ -74,6 +74,11 @@ import snowsig.music.ui.player.NowPlayingScreen
 import snowsig.music.ui.player.PlayerViewModel
 import snowsig.music.ui.playlist.PlaylistScreen
 import snowsig.music.ui.search.SearchScreen
+import snowsig.music.ui.genre.GenreScreen
+import snowsig.music.ui.lyrics.LyricsScreen
+import snowsig.music.ui.settings.EqualizerScreen
+import snowsig.music.ui.settings.SettingsScreen
+import snowsig.music.ui.player.CastButton
 
 @Serializable object HomeRoute
 @Serializable object SearchRoute
@@ -83,6 +88,9 @@ import snowsig.music.ui.search.SearchScreen
 @Serializable data class ArtistRoute(val id: String)
 @Serializable data class PlaylistRoute(val id: String)
 @Serializable object DownloadsRoute
+@Serializable object SettingsRoute
+@Serializable object EqualizerRoute
+@Serializable data class GenreRoute(val name: String)
 
 enum class Tab(val label: String, val icon: ImageVector, val route: Any) {
     Home("Home", Icons.Filled.Home, HomeRoute),
@@ -135,6 +143,7 @@ fun MainScreen(
     val nav = rememberNavController()
     val playerState by player.state.collectAsStateWithLifecycle()
     var nowPlaying by rememberSaveable { mutableStateOf(false) }
+    var lyrics by rememberSaveable { mutableStateOf(false) }
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(Unit) { actions.messages.collect { snackbar.showSnackbar(it) } }
@@ -145,6 +154,8 @@ fun MainScreen(
             override fun openAlbum(id: String) { nowPlaying = false; nav.navigate(AlbumRoute(id)) }
             override fun openArtist(id: String) { nowPlaying = false; nav.navigate(ArtistRoute(id)) }
             override fun openPlaylist(id: String) { nowPlaying = false; nav.navigate(PlaylistRoute(id)) }
+            override fun openGenre(name: String) { nowPlaying = false; nav.navigate(GenreRoute(name)) }
+            override fun openSettings() { nowPlaying = false; nav.navigate(SettingsRoute) { launchSingleTop = true } }
         }
     }
 
@@ -169,7 +180,10 @@ fun MainScreen(
                         HomeScreen(
                             displayName = user.displayName,
                             onOpenAlbum = navigator::openAlbum,
-                            recentContent = { RecentRow(it, player) },
+                            onOpenGenre = navigator::openGenre,
+                            onOpenSettings = navigator::openSettings,
+                            trackRow = { tracks, numbered -> TrackTiles(tracks, numbered, player) },
+                            headerActions = { CastButton() },
                             contentPadding = PaddingValues(top = padding.calculateTopPadding()),
                         )
                     }
@@ -182,6 +196,9 @@ fun MainScreen(
                     composable<ArtistRoute> { ArtistScreen(inner) }
                     composable<PlaylistRoute> { PlaylistScreen(inner, onDeleted = { nav.popBackStack() }) }
                     composable<DownloadsRoute> { DownloadsScreen(inner) }
+                    composable<SettingsRoute> { SettingsScreen(inner, onOpenEqualizer = { nav.navigate(EqualizerRoute) }) }
+                    composable<EqualizerRoute> { EqualizerScreen(inner) }
+                    composable<GenreRoute> { GenreScreen(inner) }
                 }
             }
             AnimatedVisibility(
@@ -189,23 +206,40 @@ fun MainScreen(
                 enter = slideInVertically { it },
                 exit = slideOutVertically { it },
             ) {
-                NowPlayingScreen(playerState, player, onClose = { nowPlaying = false }, extraActions = {
-                    playerState.current?.let { LikeButton(it.id, it.title) }
-                })
+                NowPlayingScreen(
+                    playerState,
+                    player,
+                    onClose = { nowPlaying = false },
+                    onOpenLyrics = { lyrics = true },
+                    onOpenEqualizer = { nowPlaying = false; nav.navigate(EqualizerRoute) { launchSingleTop = true } },
+                    extraActions = { playerState.current?.let { LikeButton(it.id, it.title) } },
+                )
+            }
+            AnimatedVisibility(
+                visible = lyrics && nowPlaying && playerState.current != null,
+                enter = slideInVertically { it },
+                exit = slideOutVertically { it },
+            ) {
+                LyricsScreen(playerState, onSeek = player::seekTo, onClose = { lyrics = false })
             }
         }
     }
 }
 
-/** "Recently played" tiles on Home. Tapping one plays the row from there. */
+/** A row of song tiles on Home ("Recently played", charts). Tapping one plays the row from there. */
 @Composable
-private fun RecentRow(tracks: List<TrackDto>, player: PlayerViewModel) {
+private fun TrackTiles(tracks: List<TrackDto>, numbered: Boolean, player: PlayerViewModel) {
     val queue = tracks.map { it.toQueueTrack() }
     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         itemsIndexed(queue, key = { _, t -> t.id }) { i, t ->
             Column(Modifier.width(120.dp).clickable { player.playOrToggle(queue, i) }) {
                 Artwork(t.album.cover, Modifier.size(120.dp), contentDescription = "Play ${t.title}")
-                Text(t.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (numbered) "${i + 1}. ${t.title}" else t.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Text(t.artist.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }

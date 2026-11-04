@@ -3,6 +3,7 @@ package snowsig.music.offline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.cache.CacheKeyFactory
+import snowsig.music.playback.isLosslessUri
 import snowsig.music.playback.trackIdOf
 
 /**
@@ -26,7 +27,11 @@ object TokenStrippingCacheKeyFactory : CacheKeyFactory {
 
     /** Separated from [android.net.Uri] so it's easy to test. */
     fun keyFor(uri: String, scheme: String?, path: String?): String? {
-        if (scheme == "music") return trackIdOf(android.net.Uri.parse(uri))?.let { "track:$it" }
+        if (scheme == "music") {
+            val parsed = android.net.Uri.parse(uri)
+            // The lossless playlist is a different file from the (downloadable) AAC master.
+            return trackIdOf(parsed)?.let { if (isLosslessUri(parsed)) "track:$it:lossless" else "track:$it" }
+        }
         val m = path?.let(streamPath::find) ?: return null
         return "stream/${m.groupValues[1]}/${m.groupValues[2]}"
     }

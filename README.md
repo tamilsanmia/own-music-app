@@ -124,18 +124,28 @@ All `/api` routes need `Authorization: Bearer <accessToken>` except `/api/health
 | Area | Routes |
 | --- | --- |
 | Auth | `POST /api/auth/login` (`client: "web"` or `"mobile"`), `/refresh`, `/logout` |
-| Me | `GET /api/me`, `PATCH /api/me/password` |
-| Catalog (listeners) | `GET /api/home`, `/api/artists`, `/api/artists/:id`, `/api/albums/:id` |
-| Streaming | `GET /api/tracks/:id/stream-url`, then `GET /stream/<token>/<id>/master.m3u8` (no auth header) |
+| Me | `GET /api/me`, `PATCH /api/me` (`{ displayName }`), `PATCH /api/me/password` |
+| Catalog (listeners) | `GET /api/home` (new albums, `mostPlayed`, `topThisWeek`, `genres`), `/api/artists`, `/api/artists/:id`, `/api/albums/:id`, `GET /api/genres`, `GET /api/genres/:name` |
+| Lyrics, radio | `GET /api/tracks/:id/lyrics` → `{ lyrics, synced }`; `POST /api/radio` `{ seedTrackId, excludeTrackIds?, limit? }` → similar songs |
+| Streaming | `GET /api/tracks/:id/stream-url[?quality=lossless]`, then `GET /stream/<token>/<id>/master.m3u8` (or `lossless.m3u8`; no auth header) |
 | Search | `GET /api/search?q=` → `{ tracks, albums, artists }` |
 | Library | `GET /api/me/likes`, `GET /api/me/likes/ids`, `PUT/DELETE /api/me/likes/:trackId`, `POST /api/me/history`, `GET /api/me/recent` |
 | Users (admin) | `GET/POST /api/admin/users`, `PATCH /api/admin/users/:id` |
 | Artists (admin) | `GET/POST /api/admin/artists`, `PATCH/DELETE /api/admin/artists/:id`, `PUT/DELETE /api/admin/artists/:id/image` |
-| Albums (admin) | `GET/POST /api/admin/albums`, `GET/PATCH/DELETE /api/admin/albums/:id`, `PUT/DELETE /api/admin/albums/:id/cover` |
+| Albums (admin) | `GET/POST /api/admin/albums` (with `genres`, up to 5), `GET/PATCH/DELETE /api/admin/albums/:id`, `PUT/DELETE /api/admin/albums/:id/cover`, `GET /api/admin/genres` |
 | Tracks (admin) | `POST /api/admin/tracks`, `GET/PATCH/DELETE /api/admin/tracks/:id`, `GET/PUT /api/admin/tracks/:id/upload`, `POST /api/admin/tracks/:id/upload/complete`, `POST /api/admin/tracks/:id/retry` |
 
 - Listener catalog routes only show albums and artists that have at least one playable
   (READY) track.
+- **Lyrics**: in the admin, the microphone button on a track opens the lyrics editor. Plain
+  text, or LRC (`[01:23.45] line`) for lyrics that follow the music in the Android app.
+- **Genres** are free-text tags on albums (genres or moods such as "Melody" or "Kuthu"). The
+  spelling of the first album that used a genre is kept, so "melody" joins "Melody".
+- **Lossless**: when the uploaded file is lossless (FLAC, WAV, ALAC…), the worker also writes a
+  FLAC stream (`hls/<id>/lossless.m3u8` and `flac/`), keeping up to 24-bit/96 kHz. The admin
+  shows a "Lossless" badge. MP3 and AAC uploads can't become lossless, so they don't get one.
+- **Radio** ranks songs by the same artist, shared genres, the same album and the listener's
+  likes, with some randomness. It skips the songs already queued.
 - Images are uploaded as multipart field `image` (JPEG, PNG, WebP, GIF or AVIF, max 10 MB) and
   stored as 300 px and 600 px square WebP files. Responses give their paths as
   `cover: { small, large }` (albums) or `image: { small, large }` (artists), served publicly
@@ -280,13 +290,33 @@ cached profile.
   undone if the server refuses.
 - **Offline** (`offline/`):
   - The download button on an album, playlist or Liked Songs (or "⋯ → Download") saves songs
-    to the phone at 160 kbps, about 1.2 MB a minute.
+    to the phone at the quality set in Settings: 96, 160 (default, about 1.2 MB a minute) or
+    320 kbps. Downloads are always AAC, not the lossless stream.
   - Downloaded songs always play from the phone. When offline, a banner appears, other songs
     are greyed out, and only downloaded songs are queued.
   - Plays are stored in Room and sent by WorkManager once there's a connection, with the
     time they really happened.
   - Media3 caches by URL, so cache keys drop the stream token
     (`TokenStrippingCacheKeyFactory`); otherwise downloads would be lost when their URL expired.
+
+**Added in 0.2:**
+
+- Profile & settings (avatar on Home): change name or password, log out, streaming and
+  download quality, Wi-Fi-only downloads, storage used, theme (dark/light/system) and accent
+  colour (or wallpaper colours on Android 12+).
+- Player: sleep timer (with fade-out), playback speed, equalizer and bass boost (Android's
+  built-in effects), fade between songs (0–12 s), lyrics (synced LRC scrolls along; tap a line
+  to jump), "Start radio" and "Play next" in every ⋯ menu, autoplay of similar songs when the
+  queue ends.
+- Lossless streaming (Settings → Streaming quality → Lossless) for songs uploaded as FLAC/WAV.
+- Home: your top songs, top this week, genres. Search shows genre tiles when empty.
+- Home-screen widget (long-press the home screen → Widgets → Music).
+- Android Auto: browse Home, Recent, Library and Genres, search, and voice ("play Vaali on
+  Music"). `PlaybackService` is a `MediaLibraryService`; only this app, Android Auto, Assistant
+  and system UIs may browse.
+- Chromecast: the Cast button on Home and Now Playing. Playback moves to the receiver and back
+  (Media3 `CastPlayer`). The receiver gets the AAC stream; stream files and covers allow any
+  origin (CORS) for that.
 
 **Check on a phone** (the server can't run an emulator):
 
@@ -296,6 +326,15 @@ cached profile.
 3. Turn on airplane mode, open Library → Downloads and play. Other songs are greyed out.
 4. Listen for 30 s, turn the network back on, and the play shows up under Recently played on
    the web.
+5. Settings: switch to Light theme and another accent; set Streaming quality → Lossless and
+   play a FLAC upload (Now Playing shows LOSSLESS).
+6. Now Playing ⋯: set a 5-minute sleep timer, change the speed, open Equalizer and move a
+   band; open Lyrics on a song with LRC lyrics.
+7. Play the last song of an album with Autoplay on: similar songs follow.
+8. Add the widget, and control playback from it.
+9. Android Auto: a sideloaded app only shows after enabling Android Auto's developer settings
+   (tap the version 10 times) → "Unknown sources". Or use the Desktop Head Unit from the SDK.
+10. Chromecast: phone and Cast device on the same Wi-Fi, tap the Cast button, pick the device.
 
 ## Release APK
 
@@ -361,7 +400,7 @@ microk8s kubectl -n music scale deploy/api deploy/worker --replicas=1
 | Part | Command | Count |
 | --- | --- | --- |
 | Server unit | `scripts/node.sh server npm test` | 22 |
-| Server e2e (Postgres, Redis, ffmpeg) | `scripts/node.sh server npm run test:e2e` | 95 |
-| Web (Vitest, Testing Library, MSW) | `scripts/node.sh web npm test` | 80 |
-| Android unit (JUnit, MockK, Turbine, Robolectric) | `scripts/android.sh testDebugUnitTest` | 48 |
+| Server e2e (Postgres, Redis, ffmpeg) | `scripts/node.sh server npm run test:e2e` | 112 |
+| Web (Vitest, Testing Library, MSW) | `scripts/node.sh web npm test` | 83 |
+| Android unit (JUnit, MockK, Turbine, Robolectric) | `scripts/android.sh testDebugUnitTest` | 72 |
 | Production checks | `deploy/smoke.sh`, `deploy/demo-*.sh`, `scripts/browser-demo.sh <auth\|catalog\|player\|playlist>` | |

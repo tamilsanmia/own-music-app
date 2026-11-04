@@ -64,8 +64,14 @@ class SessionManagerTest {
                     }
                 }
                 "/api/auth/logout" -> MockResponse().setResponseCode(204)
+                // Like the server: a new session, with the refresh token only for "client":"mobile".
+                "/api/me/password" ->
+                    if (request.body.readUtf8().contains("\"client\":\"mobile\"")) json(sessionJson("at-pw", "rt-pw")) else json(WEB_LOGIN_RESPONSE)
                 "/api/me" ->
-                    if (request.getHeader("Authorization") == "Bearer $validAccess") {
+                    if (request.method == "PATCH") {
+                        val name = request.body.readUtf8().substringAfter("\"displayName\":").substringBefore("}")
+                        json("""{"id":"u1","email":"ann@test.local","displayName":$name,"role":"USER","isActive":true}""")
+                    } else if (request.getHeader("Authorization") == "Bearer $validAccess") {
                         json("""{"id":"u1","email":"ann@test.local","displayName":"Ann","role":"USER","isActive":true}""")
                     } else {
                         json("""{"message":"Unauthorized","statusCode":401}""", 401)
@@ -105,6 +111,26 @@ class SessionManagerTest {
         assertEquals(SessionState.SignedIn(testUser), session.state.value)
         assertEquals("rt-1", store.session?.refreshToken)
         assertEquals("Ann", api.me().displayName)
+    }
+
+    @Test
+    fun `a new display name is shown and stored`() = runTest {
+        session.login("ann@test.local", "pw")
+        val renamed = api.updateProfile(snowsig.music.data.api.UpdateProfileRequest("Annie"))
+        session.updateUser(renamed)
+        assertEquals("Annie", (session.state.value as SessionState.SignedIn).user.displayName)
+        assertEquals("Annie", store.session?.user?.displayName)
+        assertEquals("rt-1", store.session?.refreshToken) // same session
+    }
+
+    @Test
+    fun `changing the password switches to the new session it returns`() = runTest {
+        session.login("ann@test.local", "pw")
+        val fresh = api.changePassword(snowsig.music.data.api.ChangePasswordRequest("pw", "new-password"))
+        session.replaceSession(fresh)
+        assertEquals("rt-pw", store.session?.refreshToken)
+        assertEquals("at-pw", session.accessToken)
+        assertEquals(SessionState.SignedIn(testUser), session.state.value)
     }
 
     @Test

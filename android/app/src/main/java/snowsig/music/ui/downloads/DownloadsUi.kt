@@ -57,6 +57,7 @@ class DownloadsViewModel @Inject constructor(
 ) : ViewModel() {
     val items: StateFlow<Map<String, DownloadItem>> = repo.items
     val online: StateFlow<Boolean> = connectivity.online
+    val waitingForWifi: StateFlow<Boolean> = repo.waitingForWifi
 
     fun download(tracks: List<QueueTrack>) = repo.download(tracks)
     fun remove(trackId: String) = repo.remove(trackId)
@@ -133,6 +134,7 @@ fun OfflineBanner(vm: DownloadsViewModel = hiltViewModel(), onOpenDownloads: () 
 @Composable
 fun DownloadsScreen(contentPadding: PaddingValues, vm: DownloadsViewModel = hiltViewModel(), player: PlayerViewModel = hiltViewModel()) {
     val items by vm.items.collectAsStateWithLifecycle()
+    val waitingForWifi by vm.waitingForWifi.collectAsStateWithLifecycle()
     val playerState by player.state.collectAsStateWithLifecycle()
     var confirmAll by remember { mutableStateOf(false) }
     val list = items.values.sortedWith(compareBy({ it.track.album.title }, { it.track.title }))
@@ -152,6 +154,7 @@ fun DownloadsScreen(contentPadding: PaddingValues, vm: DownloadsViewModel = hilt
                 actions = { if (list.isNotEmpty()) TextButton(onClick = { confirmAll = true }) { Text("Remove all") } },
             )
         }
+        if (waitingForWifi) item { EmptyNote("Waiting for Wi-Fi. Downloads continue when you connect (see Settings → Download over Wi-Fi only).") }
         if (list.isEmpty()) item { EmptyNote("Download albums and playlists with the download button to listen without a connection.") }
         itemsIndexed(list, key = { _, it -> it.track.id }) { _, item ->
             TrackRow(

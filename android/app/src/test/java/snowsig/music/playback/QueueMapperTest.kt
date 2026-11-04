@@ -1,9 +1,11 @@
 package snowsig.music.playback
 
 import androidx.media3.common.C
+import androidx.media3.common.DeviceInfo
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import io.mockk.every
 import io.mockk.mockk
@@ -85,6 +87,8 @@ class QueueMapperTest {
         every { shuffleModeEnabled } returns true
         every { repeatMode } returns repeat
         every { playerError } returns error
+        every { playbackParameters } returns PlaybackParameters(1.25f)
+        every { deviceInfo } returns DeviceInfo.UNKNOWN
     }
 
     @Test
@@ -117,6 +121,32 @@ class QueueMapperTest {
         val err = PlaybackException("x", null, PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED)
         assertEquals("No connection. Check your network.", snapshot(player(error = err)).error)
         assertEquals(listOf(RepeatMode.All, RepeatMode.One, RepeatMode.Off), RepeatMode.entries.map { it.next() })
+    }
+
+    @Test
+    fun `speed and casting map through`() {
+        val s = snapshot(player())
+        assertEquals(1.25f, s.speed)
+        assertFalse(s.casting)
+    }
+
+    @Test
+    fun `lossless tracks keep the flag and use the FLAC stream only when asked`() {
+        val hiRes = track.copy(lossless = true)
+        val item = hiRes.toMediaItem()
+        assertEquals(hiRes, item.toQueueTrack())
+        // The UI always queues the plain URI; the service picks the stream.
+        assertEquals("music://track/t1", item.localConfiguration!!.uri.toString())
+        val fromController = MediaItem.Builder().setMediaId("t1").setMediaMetadata(item.mediaMetadata).build()
+        assertEquals("music://track/t1?q=lossless", fromController.withPlayableUri(preferLossless = true).localConfiguration!!.uri.toString())
+        assertEquals("music://track/t1", fromController.withPlayableUri(preferLossless = false).localConfiguration!!.uri.toString())
+        // A track without a FLAC stream stays on AAC even when lossless is preferred.
+        val plain = MediaItem.Builder().setMediaId("t1").setMediaMetadata(track.toMediaItem().mediaMetadata).build()
+        assertEquals("music://track/t1", plain.withPlayableUri(preferLossless = true).localConfiguration!!.uri.toString())
+        val lossless = android.net.Uri.parse("music://track/t1?q=lossless")
+        assertEquals("t1", trackIdOf(lossless))
+        assertTrue(isLosslessUri(lossless))
+        assertFalse(isLosslessUri(trackUri("t1")))
     }
 
     @Test

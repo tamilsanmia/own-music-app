@@ -16,10 +16,15 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import androidx.compose.material3.Text
 import snowsig.music.data.api.AlbumRef
+import snowsig.music.data.api.GenreDto
 import snowsig.music.data.api.Ref
+import snowsig.music.data.api.TrackDto
 import snowsig.music.playback.PlayerUiState
 import snowsig.music.playback.QueueTrack
+import snowsig.music.ui.home.HomeContent
+import snowsig.music.ui.home.HomeUiState
 import snowsig.music.ui.player.MiniPlayer
 import snowsig.music.ui.theme.MusicTheme
 
@@ -27,6 +32,40 @@ import snowsig.music.ui.theme.MusicTheme
 @Config(sdk = [35])
 class NavigationUiTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test
+    fun `home shows top songs, this week's chart and genres, and opens a genre and settings`() {
+        var genre: String? = null
+        var settings = 0
+        val song = TrackDto("t1", "Nilavai", 1, 367_000, Ref("a", "Deva"), AlbumRef("al", "Vaali"))
+        compose.setContent {
+            MusicTheme {
+                HomeContent(
+                    HomeUiState(
+                        loading = false,
+                        mostPlayed = listOf(song),
+                        topThisWeek = listOf(song.copy(id = "t2", title = "Kushi")),
+                        genres = listOf(GenreDto("Melody", 2)),
+                    ),
+                    displayName = "Ann",
+                    onOpenAlbum = {},
+                    onRefresh = {},
+                    onOpenGenre = { genre = it },
+                    onOpenSettings = { settings++ },
+                    trackRow = { tracks, numbered -> Text(tracks.joinToString { (if (numbered) "#" else "") + it.title }) },
+                )
+            }
+        }
+        compose.onNodeWithText("Your top songs").assertExists()
+        compose.onNodeWithText("Nilavai").assertExists()
+        compose.onNodeWithText("Top this week").assertExists()
+        compose.onNodeWithText("#Kushi").assertExists()
+        compose.onNodeWithText("Recently played").assertDoesNotExist() // empty sections are hidden
+        compose.onNodeWithContentDescription("Genre Melody, 2 albums").performClick()
+        assertEquals("Melody", genre)
+        compose.onNodeWithContentDescription("Profile and settings").performClick()
+        assertEquals(1, settings)
+    }
 
     @Test
     fun `bottom bar switches tabs`() {

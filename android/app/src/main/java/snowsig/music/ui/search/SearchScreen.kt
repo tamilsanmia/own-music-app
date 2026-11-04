@@ -1,6 +1,11 @@
 package snowsig.music.ui.search
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -43,10 +48,14 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import snowsig.music.data.api.GenreDto
 import snowsig.music.data.api.MusicApi
 import snowsig.music.data.api.SearchDto
 import snowsig.music.data.api.userMessage
 import snowsig.music.playback.toQueueTrack
+import snowsig.music.ui.common.Loadable
+import snowsig.music.ui.common.loadInto
+import snowsig.music.ui.genre.GenreTile
 import snowsig.music.ui.components.Artwork
 import snowsig.music.ui.components.EmptyNote
 import snowsig.music.ui.components.Loading
@@ -77,7 +86,12 @@ class SearchViewModel @Inject constructor(private val api: MusicApi) : ViewModel
     private val _results = MutableStateFlow<SearchResultState>(SearchResultState.Idle)
     val results: StateFlow<SearchResultState> = _results.asStateFlow()
 
+    private val _genres = MutableStateFlow(Loadable<List<GenreDto>>())
+    /** Shown while the search box is empty. */
+    val genres: StateFlow<Loadable<List<GenreDto>>> = _genres.asStateFlow()
+
     init {
+        viewModelScope.loadInto(_genres) { api.genres() }
         viewModelScope.launch {
             // Wait for a pause in typing, skip repeats, and cancel an older search when a newer one starts.
             _query.debounce(SEARCH_DEBOUNCE_MS).map { it.trim() }.distinctUntilChanged().collectLatest { q ->
@@ -105,6 +119,7 @@ class SearchViewModel @Inject constructor(private val api: MusicApi) : ViewModel
 fun SearchScreen(contentPadding: PaddingValues, vm: SearchViewModel = hiltViewModel(), player: PlayerViewModel = hiltViewModel()) {
     val query by vm.query.collectAsStateWithLifecycle()
     val results by vm.results.collectAsStateWithLifecycle()
+    val genres by vm.genres.collectAsStateWithLifecycle()
     val playerState by player.state.collectAsStateWithLifecycle()
     val nav = LocalNavigator.current
 
@@ -128,7 +143,7 @@ fun SearchScreen(contentPadding: PaddingValues, vm: SearchViewModel = hiltViewMo
             modifier = Modifier.fillMaxWidth().padding(16.dp).semantics { contentDescription = "Search" },
         )
         when (val r = results) {
-            SearchResultState.Idle -> EmptyNote("Search for songs, albums and artists.")
+            SearchResultState.Idle -> BrowseGenres(genres.data.orEmpty(), contentPadding, nav::openGenre)
             is SearchResultState.Loading -> Loading()
             is SearchResultState.Error -> EmptyNote(r.message)
             is SearchResultState.Results -> if (r.isEmpty) {
@@ -169,5 +184,21 @@ fun SearchScreen(contentPadding: PaddingValues, vm: SearchViewModel = hiltViewMo
                 }
             }
         }
+    }
+}
+
+/** "Browse all": genre tiles, two per row. */
+@Composable
+private fun BrowseGenres(genres: List<GenreDto>, contentPadding: PaddingValues, onOpen: (String) -> Unit) {
+    if (genres.isEmpty()) return EmptyNote("Search for songs, albums and artists.")
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 160.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = contentPadding.calculateBottomPadding() + 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        item(span = { GridItemSpan(maxLineSpan) }) { Text("Browse all", style = MaterialTheme.typography.titleLarge) }
+        gridItems(genres, key = { it.name }) { g -> GenreTile(g, onClick = { onOpen(g.name) }) }
     }
 }

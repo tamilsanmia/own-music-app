@@ -26,6 +26,13 @@ interface MusicApi {
     @GET("api/me")
     suspend fun me(): UserDto
 
+    @PATCH("api/me")
+    suspend fun updateProfile(@Body body: UpdateProfileRequest): UserDto
+
+    /** Ends every other session and returns a new one for this phone. */
+    @PATCH("api/me/password")
+    suspend fun changePassword(@Body body: ChangePasswordRequest): SessionDto
+
     @GET("api/home")
     suspend fun home(): HomeDto
 
@@ -35,8 +42,21 @@ interface MusicApi {
     @GET("api/artists/{id}")
     suspend fun artist(@Path("id") id: String): ArtistDetailDto
 
+    /** quality = "lossless" asks for the FLAC stream (the normal one if the track has none). */
     @GET("api/tracks/{id}/stream-url")
-    suspend fun streamUrl(@Path("id") trackId: String): StreamUrlDto
+    suspend fun streamUrl(@Path("id") trackId: String, @Query("quality") quality: String? = null): StreamUrlDto
+
+    @GET("api/tracks/{id}/lyrics")
+    suspend fun lyrics(@Path("id") trackId: String): LyricsDto
+
+    @POST("api/radio")
+    suspend fun radio(@Body body: RadioRequest): ItemsDto<TrackDto>
+
+    @GET("api/genres")
+    suspend fun genres(): List<GenreDto>
+
+    @GET("api/genres/{name}")
+    suspend fun genre(@Path("name") name: String): GenreDetailDto
 
     @GET("api/search")
     suspend fun search(@Query("q") query: String): SearchDto

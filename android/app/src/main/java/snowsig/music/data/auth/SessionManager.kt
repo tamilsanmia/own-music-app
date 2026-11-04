@@ -82,6 +82,16 @@ class SessionManager @Inject constructor(
         }
     }
 
+    /** After the profile changed on the server (e.g. a new display name). */
+    suspend fun updateUser(user: UserDto) = mutex.withLock {
+        if (_state.value !is SessionState.SignedIn) return@withLock
+        store.read()?.let { store.save(it.refreshToken, user) }
+        _state.value = SessionState.SignedIn(user)
+    }
+
+    /** A new session from the server, e.g. after changing the password (which ends all others). */
+    suspend fun replaceSession(session: SessionDto) = mutex.withLock { accept(session) }
+
     suspend fun logout() {
         val token = mutex.withLock {
             val t = store.read()?.refreshToken

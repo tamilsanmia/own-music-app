@@ -3,9 +3,11 @@ package snowsig.music.playback
 import android.content.ComponentName
 import android.content.Context
 import androidx.media3.common.C
+import androidx.media3.common.DeviceInfo
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
@@ -37,6 +39,9 @@ data class PlayerUiState(
     val shuffle: Boolean = false,
     val repeat: RepeatMode = RepeatMode.Off,
     val error: String? = null,
+    val speed: Float = 1f,
+    /** Playing on a Chromecast rather than this phone. */
+    val casting: Boolean = false,
 )
 
 /** Plain snapshot of a player, so the mapping to UI state can be unit-tested with a fake player. */
@@ -59,6 +64,8 @@ fun snapshot(p: Player): PlayerUiState {
             else -> RepeatMode.Off
         },
         error = p.playerError?.let(::describe),
+        speed = p.playbackParameters.speed,
+        casting = p.deviceInfo.playbackType == DeviceInfo.PLAYBACK_TYPE_REMOTE,
     )
 }
 
@@ -98,6 +105,7 @@ class PlayerConnection @Inject constructor(@ApplicationContext private val conte
     }
 
     /** Connect if not yet connected (e.g. when the app starts while music plays in the background). */
+    @androidx.annotation.OptIn(UnstableApi::class)
     fun connect() {
         if (controller != null || connecting) return
         connecting = true
@@ -114,6 +122,9 @@ class PlayerConnection @Inject constructor(@ApplicationContext private val conte
             updateTicker()
         }, MoreExecutors.directExecutor())
     }
+
+    /** Run [action] once connected to the playback service (at once if already connected). */
+    fun whenConnected(action: (MediaController) -> Unit) = withController(action)
 
     private fun withController(action: (MediaController) -> Unit) {
         controller?.let { action(it); return }
@@ -148,6 +159,28 @@ class PlayerConnection @Inject constructor(@ApplicationContext private val conte
     fun skipTo(index: Int) = withController { it.seekTo(index, 0); it.play() }
 
     fun toggleShuffle() = withController { it.shuffleModeEnabled = !it.shuffleModeEnabled }
+
+    /** Voice search ("play Vaali"): the service turns the query into search results. */
+    fun playFromSearch(query: String) = withController { c ->
+        val item = MediaItem.Builder().setRequestMetadata(MediaItem.RequestMetadata.Builder().setSearchQuery(query).build()).build()
+        c.setMediaItems(listOf(item))
+        c.prepare()
+        c.play()
+    }
+
+    /** 1.0 is normal; the pitch stays the same. */
+    fun setSpeed(speed: Float) = withController { it.setPlaybackSpeed(speed.coerceIn(0.25f, 3f)) }
+
+    /** Play [tracks] right after the current song. */
+    fun playNext(tracks: List<QueueTrack>) = withController { c ->
+        if (c.mediaItemCount == 0) {
+            c.setMediaItems(tracks.map { it.toMediaItem() })
+            c.prepare()
+            c.play()
+        } else {
+            c.addMediaItems(c.currentMediaItemIndex + 1, tracks.map { it.toMediaItem() })
+        }
+    }
 
     fun cycleRepeat() = withController { c ->
         c.repeatMode = when (snapshot(c).repeat.next()) {

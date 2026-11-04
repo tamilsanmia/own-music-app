@@ -55,6 +55,7 @@ data class AlbumDto(
     val releaseYear: Int? = null,
     val artist: Ref,
     val cover: ImageUrls? = null,
+    val genres: List<String> = emptyList(),
 )
 
 @Serializable
@@ -66,6 +67,9 @@ data class TrackDto(
     val artist: Ref,
     /** Present outside album pages (search, likes, recent, playlists). */
     val album: AlbumRef? = null,
+    val hasLyrics: Boolean = false,
+    /** A FLAC stream exists (the original upload was lossless). */
+    val lossless: Boolean = false,
 )
 
 @Serializable
@@ -75,6 +79,7 @@ data class AlbumDetailDto(
     val releaseYear: Int? = null,
     val artist: Ref,
     val cover: ImageUrls? = null,
+    val genres: List<String> = emptyList(),
     val tracks: List<TrackDto>,
 )
 
@@ -91,13 +96,44 @@ data class ArtistDetailDto(
 )
 
 @Serializable
-data class HomeDto(val newAlbums: List<AlbumDto>)
+data class GenreDto(val name: String, val albumCount: Int = 0, val cover: ImageUrls? = null)
+
+@Serializable
+data class GenreDetailDto(val name: String, val albums: List<AlbumDto>)
+
+@Serializable
+data class HomeDto(
+    val newAlbums: List<AlbumDto>,
+    /** Your most played songs (last 90 days). */
+    val mostPlayed: List<TrackDto> = emptyList(),
+    /** Most played by everyone in the last 7 days. */
+    val topThisWeek: List<TrackDto> = emptyList(),
+    val genres: List<GenreDto> = emptyList(),
+)
+
+@Serializable
+data class LyricsDto(val lyrics: String? = null, val synced: Boolean = false)
+
+@Serializable
+data class RadioRequest(val seedTrackId: String, val excludeTrackIds: List<String> = emptyList(), val limit: Int = 20)
+
+@Serializable
+data class UpdateProfileRequest(val displayName: String)
+
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class ChangePasswordRequest(
+    val currentPassword: String,
+    val newPassword: String,
+    /** Mobile: the new session's refresh token comes back in the body. */
+    @EncodeDefault val client: String = "mobile",
+)
 
 @Serializable
 data class ItemsDto<T>(val items: List<T>, val total: Int? = null)
 
 @Serializable
-data class StreamUrlDto(val url: String, val expiresAt: String)
+data class StreamUrlDto(val url: String, val expiresAt: String, val lossless: Boolean = false)
 
 @Serializable
 data class SearchDto(val tracks: List<TrackDto>, val albums: List<AlbumDto>, val artists: List<ArtistDto>)

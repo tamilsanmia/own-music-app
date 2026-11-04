@@ -26,9 +26,12 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   docker build -q -t "$IMAGE" "$DIR/ci" >/dev/null
 fi
 docker volume create music-android-gradle >/dev/null
+docker volume create music-android-m2 >/dev/null
+# ~/.m2 holds Robolectric's android-all jar; keeping it avoids re-downloading (and Maven Central 429s).
 docker run --rm \
   -v "$DIR":/project -w /project \
   -v music-android-gradle:/root/.gradle \
+  -v music-android-m2:/root/.m2 \
   -e GRADLE_OPTS="-Dorg.gradle.daemon=false" \
   "$IMAGE" ./gradlew --no-daemon --console=plain "$@"
 REMOTE

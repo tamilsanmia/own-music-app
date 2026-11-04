@@ -29,6 +29,17 @@ import javax.inject.Named
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
+/**
+ * JSON settings for the API. Default values are encoded, so request fields that have defaults
+ * are still sent; nulls are left out; unknown response fields are ignored.
+ */
+val apiJson: Json = Json {
+    ignoreUnknownKeys = true
+    explicitNulls = false
+    coerceInputValues = true
+    encodeDefaults = true
+}
+
 /** A scope for work that should outlive any screen (e.g. reporting plays). */
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
@@ -49,11 +60,7 @@ abstract class BindingsModule {
 object AppModule {
     @Provides
     @Singleton
-    fun json(): Json = Json {
-        ignoreUnknownKeys = true
-        explicitNulls = false
-        coerceInputValues = true
-    }
+    fun json(): Json = apiJson
 
     @Provides
     @Singleton

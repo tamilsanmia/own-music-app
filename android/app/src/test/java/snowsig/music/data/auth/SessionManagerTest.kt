@@ -31,6 +31,7 @@ class SessionManagerTest {
     private lateinit var session: SessionManager
     private lateinit var api: MusicApi
     private val refreshes = AtomicInteger()
+    private val loginBodies = java.util.concurrent.CopyOnWriteArrayList<String>()
 
     /** Server state: which access token is valid and which refresh token it accepts. */
     @Volatile private var validAccess = "at-1"
@@ -42,7 +43,13 @@ class SessionManagerTest {
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
-                "/api/auth/login" -> json(sessionJson("at-1", "rt-1"))
+                // Like the real server: only "client":"mobile" gets the refresh token in the body.
+                "/api/auth/login" ->
+                    if (request.body.readUtf8().also { loginBodies += it }.contains("\"client\":\"mobile\"")) {
+                        json(sessionJson("at-1", "rt-1"))
+                    } else {
+                        json(WEB_LOGIN_RESPONSE)
+                    }
                 "/api/auth/refresh" -> {
                     refreshes.incrementAndGet()
                     Thread.sleep(50) // let concurrent 401s pile up
@@ -78,6 +85,19 @@ class SessionManagerTest {
 
     @After
     fun tearDown() = server.shutdown()
+
+    private companion object {
+        /** What the server answers a login without "client":"mobile": no refresh token. */
+        const val WEB_LOGIN_RESPONSE =
+            """{"accessToken":"at-1","expiresIn":900,"user":{"id":"u1","email":"ann@test.local","displayName":"Ann","role":"USER","isActive":true}}"""
+    }
+
+    @Test
+    fun `login asks the server for a mobile session`() = runTest {
+        session.login("ann@test.local", "pw")
+        assertEquals(1, loginBodies.size)
+        assertEquals(true, loginBodies[0].contains("\"client\":\"mobile\""))
+    }
 
     @Test
     fun `login stores the refresh token and signs in`() = runTest {

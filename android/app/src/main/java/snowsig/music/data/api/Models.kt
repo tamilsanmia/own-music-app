@@ -1,5 +1,7 @@
 package snowsig.music.data.api
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /** JSON shapes of the server API (see server/src/**/presenters.ts). */
@@ -13,8 +15,17 @@ data class UserDto(
     val isActive: Boolean = true,
 )
 
+/**
+ * "client": "mobile" makes the server return the refresh token in the body (web clients get a
+ * cookie instead). It must always be sent, even though it's a default value.
+ */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
-data class LoginRequest(val email: String, val password: String, val client: String = "mobile")
+data class LoginRequest(
+    val email: String,
+    val password: String,
+    @EncodeDefault val client: String = "mobile",
+)
 
 @Serializable
 data class RefreshRequest(val refreshToken: String)

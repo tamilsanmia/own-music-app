@@ -36,7 +36,8 @@ class InMemoryTokenStore(var session: StoredSession? = null) : TokenStore {
     }
 }
 
-val testJson = Json { ignoreUnknownKeys = true; explicitNulls = false }
+/** The app's real JSON settings, so tests catch serialization mistakes. */
+val testJson: Json = snowsig.music.di.apiJson
 
 fun <T> retrofitFor(server: MockWebServer, client: OkHttpClient, api: Class<T>): T = Retrofit.Builder()
     .baseUrl(server.url("/"))
